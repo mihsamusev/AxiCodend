@@ -8,6 +8,24 @@ namespace AxiCodend
 {
     class AxiCodend
     {
+        //====================
+        // CLASS VARIABLES
+        //====================
+
+
+        //====================
+        // CLASS CONSTRUCTOR
+        //====================
+
+        public AxiCodend(int nx, int nr, double r0, HexMeshPanelMaterial Material)
+        {
+
+        }
+
+        //====================
+        // CLASS METHODS
+        //====================
+
 
     }
 }
