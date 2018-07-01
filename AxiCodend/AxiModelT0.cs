@@ -6,43 +6,13 @@ using CSparse;
 
 namespace AxiCodend
 {
-    class AxiModelT0
+    class AxiModelT0 : AxiCodend
     {
-        // CLASS VARIABLES
-        #region
-        /*codend paramters*/
-        public int nx;              // amount of meshes along the codend length
-        public int nr;              // amount of meshes in the codend`s circumference
-        public double r0;           // entrance radius
-        public int nc;              // moundt of meshes along the codend length contatining catch 
+        private const int nbc_beg = 2;	// nb of fixed dof at entry (x0 r0)
+        private const int nbc_end = 1;    // nb of fixed dof at the end (rn)
 
-        /*mesh characteristics*/
-        private double l0;           // length of un-stretched knot       
-        private double m0;           // length of un-stretched twine
-        private double kl;           // stiffness of a knot
-        private double km;           // stiffness of a twine
-
-        /* operation */
-        public double towSpeed;
-        private double P;            // catch pressure
-        #endregion
-
-        public HexMeshPanelMaterial Material;
-        /* calculation variables*/
-        #region
-        public readonly int dof;            // nb of dof
-        public readonly int nbc_beg = 2;	// nb of fixed dof at entry (x0 r0)
-        public readonly int nbc_end = 1;    // nb of fixed dof at the end (rn)
-
-        const double pi = Math.PI;
-        private int ncp;                          // node number indicating start of application of the catch pressure
+        private const double pi = Math.PI;
         private double theta, co, si, co2, si2;   // angle between 2 radial planes + sin cos of single and double theta
-
-        public double R;                         // residue
-        public double[] X;                       // Shape
-        public double[] F;                       // force vectors
-        private CoordinateStorage<double> Jcs;   // Sparse Jacobians
-        public CompressedColumnStorage<double> J;
 
         /*help figures and help variables*/
         #region
@@ -88,58 +58,23 @@ namespace AxiCodend
         //
         #endregion
 
-        #endregion
-
         // CLASS CONSTRUCTS
 
-        public AxiModelT0(int nx, int nr, double r0, HexMeshPanelMaterial Material)
+        public AxiModelT0(int nx, int nr, double r0, HexMeshPanelMaterial Material) : base(nx, nr, r0, Material)
         {
-            /*main inputs*/
-            this.nx = nx;
-            this.nr = nr;
-            this.r0 = r0;
-            this.Material = Material;
-
-            l0 = Material.KnotSize;
-            m0 = Material.MeshSide / 2;
-            kl = Material.KnotEA;
-            km = Material.TwineEA;
-
-            dof = nx * 8 + 2;
-
-            // default towing and catch to start with
-            nc = nx;
-            ncp = 1 + 4 * nx - 4 * nc;
-
-            towSpeed = 1;
-            P = 0.5 * 1.4 * 1025.0 * Math.Pow(towSpeed, 2);
-
-            /*initialize state*/
-            ClearState();
-
-            /*angles and trigonometric functions*/
-            SetAngles();
+            InitDOF();                  // dof number                 
+            InitBlockedMeshes();        // blocked meshes 
+            ClearState();               // initialize FE vectors and matrices
+            SetAngles();                // set angles and trigonometric functions
         }
 
-        public AxiModelT0(PathsIO path)
-        {
-            /*main inputs*/
-            LoadInput(path);
-
-            dof = nx * 8 + 2;
-
-            // default towing and catch to start with
-            nc = nx;
-            ncp = 1 + 4 * nx - 4 * nc;
-
-            towSpeed = 1;
-            P = 0.5 * 1.4 * 1025.0 * Math.Pow(towSpeed, 2);
-
-            /*initialize state*/
-            ClearState();
-
-            /*angles and trigonometric functions*/
-            SetAngles();
+        public AxiModelT0(PathsIO path) : base(path)
+        {          
+            LoadInput(path);            // read from input file
+            InitDOF();                  // dof number                 
+            InitBlockedMeshes();        // blocked meshes 
+            ClearState();               // initialize FE vectors and matrices
+            SetAngles();                // set angles and trigonometric functions
         }
 
 
@@ -218,6 +153,16 @@ namespace AxiCodend
 
         /* for updating*/
 
+        protected override void InitDOF()
+        {
+            dof = nx * 8 + 2;           // dof number  
+        }
+
+        protected override void InitBlockedMeshes()
+        {
+            ncp = 1 + 4 * nx - 4 * nc;  // blocked meshes 
+        }
+
         private void SetAngles()
         {
             theta = pi / nr;
@@ -227,7 +172,7 @@ namespace AxiCodend
             si2 = Math.Sin(2 * theta);
         }
 
-        public void ClearState()
+        public override void ClearState()
         {
             X = new double[dof];
             F = new double[dof];
@@ -235,7 +180,7 @@ namespace AxiCodend
             Jcs = new CoordinateStorage<double>(dof, dof, 4 * 4 + (dof - 4) * 6);
         }
 
-        public void UpdatePosition(double[] h, double lambda)
+        public override void UpdatePosition(double[] h, double lambda)
         {
             for (int i = nbc_beg; i < dof - nbc_end; i++)
             {
@@ -243,13 +188,13 @@ namespace AxiCodend
             }
         }
 
-        public void ApplyCatch(int newCatch)
+        public override void ApplyCatch(int newCatch)
         {
             nc = newCatch;
             ncp = 1 + 4 * nx - 4 * nc;
         }
 
-        public void ApplyTowing(double newSpeed)
+        public override void ApplyTowing(double newSpeed)
         {
             towSpeed = newSpeed;
             P = 0.5 * 1.4 * 1025.0 * Math.Pow(towSpeed, 2);
@@ -257,7 +202,7 @@ namespace AxiCodend
 
         /* initial shape*/
 
-        public void SetInitialShape()
+        public override void SetInitialShape()
         {
             for (int i = 0; i < dof / 2; i++)
             {
@@ -268,7 +213,17 @@ namespace AxiCodend
             X[dof - 1] = 0;
         }
 
-        public void SetInitialShapeSmooth()
+        public override void SetInitialShape(string path)
+        {
+            string[] lines = File.ReadAllLines(path);
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                X[i] = Convert.ToDouble(lines[i]);
+            }
+        }
+
+        public override void SetInitialShapeSmooth()
         {
             double fStretch = 1.005;
             int Lint = (int)(pi * r0 / (fStretch * (l0 + m0)));
@@ -312,16 +267,6 @@ namespace AxiCodend
                 //Console.WriteLine(2 * i + dof - 2 * Lint + "\t" + omega +"\t" + X0[2 * i + dof - 2 * Lint] + "\t" + X0[2 * i + 1 + dof - 2 * Lint]);
             }
             X[dof - 1] = 0;
-        }
-
-        public void SetInitialShape(string path)
-        {
-            string[] lines = File.ReadAllLines(path);
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                X[i] = Convert.ToDouble(lines[i]);
-            }
         }
 
         /* forces*/
@@ -522,14 +467,14 @@ namespace AxiCodend
 
         }
 
-        public void UpdateTotalForces(bool IncludeBC)
+        public override void UpdateTotalForces(bool IncludeBC)
         {
             Array.Clear(F, 0, F.Length);
             SetTwineForces(IncludeBC);
             SetCatchForces(IncludeBC);
         }
 
-        public void UpdateResidual()
+        public override void UpdateResidual()
         {
             R = 0;
             for (int i = nbc_beg; i < dof - nbc_end; i++)
@@ -838,7 +783,7 @@ namespace AxiCodend
             #endregion
         }
 
-        public void UpdateTotalJacobian(double kDiag, bool IncludeBC)
+        public override void UpdateTotalJacobian(double kDiag, bool IncludeBC)
         {
             Jcs = new CoordinateStorage<double>(dof, dof, 4 * 4 + (dof - 4) * 6);
             SetTwineJacobian(IncludeBC);
@@ -860,12 +805,12 @@ namespace AxiCodend
 
         /* results*/
 
-        public double Length()
+        public override double Length()
         {
             return X[dof - 2];
         }
 
-        public double MaxRadius()
+        public override double MaxRadius()
         {
             double rMax = r0;                           // maximum radius
             for (int i = 1; i < dof / 2; i++)
@@ -878,24 +823,24 @@ namespace AxiCodend
             return rMax;
         }
 
-        public double EntranceDrag()
+        public override double EntranceDrag()
         {
             UpdateTotalForces(IncludeBC: false);
             return nr * F[0];                                   // resultant entrance reaction
         }
 
-        public double CatchDrag()
+        public override double CatchDrag()
         {
             double rCatch = X[2 * ncp - 1];      // radius at the beginning of the catch
             return pi * Math.Pow(rCatch, 2) * P; // resultant catch drag
         }
 
-        public double CatchThickness()
+        public override double CatchThickness()
         {
             return X[dof - 2] - X[2 * ncp - 2];
         }
 
-        public double CatchVolume()
+        public override double CatchVolume()
         {
             double V = 0;
             for (int i = ncp; i < dof / 2; i++)
@@ -908,7 +853,7 @@ namespace AxiCodend
             return V;
         }
 
-        public double CatchSurface()
+        public override double CatchSurface()
         {
             double S = 0;
             for (int i = ncp; i < dof / 2; i++)         

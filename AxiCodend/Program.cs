@@ -43,8 +43,21 @@ namespace AxiCodend
             var hexMeshPanel = new HexMeshPanelMaterial(path);
             hexMeshPanel.PrintInfo();
 
-            var codend = new AxiModelT0(path);   // To start with initialize T0 model
-
+            AxiCodend codend = new AxiCodend();
+       
+            if (hexMeshPanel.MeshOrientation == 0)
+            {
+                codend = new AxiModelT0(path);   // To start with initialize T0 model
+            }
+            else if(hexMeshPanel.MeshOrientation == 90)
+            {
+                //codend = new AxiModelT90(path);   // To start with initialize T0 model
+            }
+            else
+            {
+                throw new IOException("Incorrect mesh orientation. Value should be 0 or 90.");
+            }
+            
             var towing = new Towing(path);
 
             var catches = new Catch(path);
