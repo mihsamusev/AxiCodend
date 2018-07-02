@@ -796,18 +796,6 @@ namespace AxiCodend
 
         /* printing*/
 
-        public void PrintResults()
-        {
-            Console.WriteLine("\nResults:");
-            Console.WriteLine("Total codend length:             {0,10:N3} [m]", X[dof - 2]);
-            Console.WriteLine("Maximum codend radius:           {0,10:N3} [m]", MaxRadius());
-            Console.WriteLine("Catch extent:                    {0,10:N3} [m]", CatchThickness());
-            Console.WriteLine("Surface in contact with catch:   {0,10:N3} [m^2]", CatchSurface());
-            Console.WriteLine("Catch volume:                    {0,10:N3} [m^3]", CatchVolume());
-            Console.WriteLine("Resultant entrance reaction:     {0,10:N0} [N]", EntranceDrag());
-            Console.WriteLine("Total catch drag force:          {0,10:N0} [N]\n", CatchDrag());
-        }
-
         private void PrintVector(double[] Array)
         {
             Console.WriteLine();

@@ -44,8 +44,7 @@ namespace AxiCodend
 
 
         private double[] x, y, z, r;                // initial shape, coordinates and radii vectors
-        private double[][] dFAdX,dFBdX,dFFdX,       // helper jacobian matrices (stiffness from twines going around, backward, forward) 
-                           dFTdX,dFCdX,dFdX;        // jacobian due to twine force, catch force and total force
+        private double[][] Jjag;                    // jacobian due to twine force, catch force and total force
 
         //====================
         // CLASS CONSTRUCTOR
@@ -61,38 +60,9 @@ namespace AxiCodend
 
         }
 
-        // CLASS CONSTRUCTS
-        #region
-
-        //    /* sizes */
-        //    
-        //    
-
-
-
-        //    /*force vectors and jacobian matrices*/
-        //    #region
-
-        //    dFTdX = new double[dof][];
-        //    dFCdX = new double[dof][];
-        //    dFAdX = new double[dof][];
-        //    dFBdX = new double[dof][];
-        //    dFFdX = new double[dof][];
-        //    dFdX = new double[dof][];
-        //    for (int i = 0; i < dof; i++)
-        //    {
-        //        dFTdX[i] = new double[dof];
-        //        dFAdX[i] = new double[dof];
-        //        dFBdX[i] = new double[dof];
-        //        dFFdX[i] = new double[dof];
-        //        dFCdX[i] = new double[dof];
-        //        dFdX[i] = new double[dof];
-        //    }
-        //    #endregion
-        //}
-        #endregion
-
+        //=====================
         // CLASS METHODS
+        //=====================
 
         /* for updating/initializing*/
 
@@ -125,7 +95,12 @@ namespace AxiCodend
 
             F = new double[dof];
             R = 0;
-            Jcs = new CoordinateStorage<double>(dof, dof, 6 * 6 + (dof - 6) * 9);
+
+            Jjag = new double[dof][];
+            for (int i = 0; i < dof; i++)
+            {
+                Jjag[i] = new double[dof];
+            }
         }
 
         public override void UpdatePosition(double[] h, double lambda)
@@ -445,70 +420,7 @@ namespace AxiCodend
 
         /* jacobian and stiffness*/
 
-        private void BandAdd2(ref double[][] AB,double[][] A, double[][] B)
-        {
-            int shift = 0;                    // Faster way is to add only the band terms ignoring zeros
-            int width = 0;
-
-            for (int i = 0; i < dof; i++)
-            {
-                if (i < 3)
-                {
-                    width = 6;
-                    shift = 0;
-                }
-                else if (i > dof - 4)
-                {
-                    width = 6;
-                    shift = dof - width;
-                }
-                else
-                {
-                    shift = shift = 3 * (i / 3) - 3; // integer division (no remainder)
-                    width = 9;
-                }
-
-                for (int j = 0; j < width; j++)
-                {
-                    AB[i][j + shift] =   A[i][j + shift]
-                                       + B[i][j + shift];
-                }
-            }
-        }
-
-        private void BandAdd3(ref double[][] ABC, double[][] A, double[][] B, double[][] C)
-        {
-            int shift = 0;                    // Faster way is to add only the band terms ignoring zeros
-            int width = 0;
-
-            for (int i = 0; i < dof; i++)
-            {
-                if (i < 3)
-                {
-                    width = 6;
-                    shift = 0;
-                }
-                else if (i > dof - 4)
-                {
-                    width = 6;
-                    shift = dof - width;
-                }
-                else
-                {
-                    shift = shift = 3 * (i / 3) - 3; // integer division (no remainder)
-                    width = 9;
-                }
-
-                for (int j = 0; j < width; j++)
-                {
-                    ABC[i][j + shift] =  A[i][j + shift]
-                                       + B[i][j + shift]
-                                       + C[i][j + shift];
-                }
-            }
-        }
-
-        public double[][] GetTwineJacobian(double[] X)
+        private void SetTwineJacobianJagged()
         {
             for (int i = 0; i < dof / 3; i++)
             {
@@ -526,11 +438,11 @@ namespace AxiCodend
 
                 if (l < l0)
                 {
-                    dFAdX[6 * i + 1][6 * i + 1] = 0;                // Fy with respect to y
+                    Jjag[6 * i + 1][6 * i + 1] += 0;                // Fy with respect to y
                 }
                 else
                 {
-                    dFAdX[6 * i + 1][6 * i + 1] = -2 * kl / l0;     // Fy with respect to y
+                    Jjag[6 * i + 1][6 * i + 1] += -2 * kl / l0;     // Fy with respect to y
                 }
             }
 
@@ -543,20 +455,20 @@ namespace AxiCodend
                 if (l < l0)
                 {
                     // Fy with respect to y and z
-                    dFAdX[6 * i - 2][6 * i - 2] = 0;    
-                    dFAdX[6 * i - 2][6 * i - 1] = 0;
+                    Jjag[6 * i - 2][6 * i - 2] += 0;    
+                    Jjag[6 * i - 2][6 * i - 1] += 0;
                     // Fz with respect to y and z
-                    dFAdX[6 * i - 1][6 * i - 2] = 0;
-                    dFAdX[6 * i - 1][6 * i - 1] = 0;
+                    Jjag[6 * i - 1][6 * i - 2] += 0;
+                    Jjag[6 * i - 1][6 * i - 1] += 0;
                 }
                 else
                 {
                     // Fy with respect to y and z
-                    dFAdX[6 * i - 2][6 * i - 2] = ((-co - 1) * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
-                    dFAdX[6 * i - 2][6 * i - 1] = (si * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
+                    Jjag[6 * i - 2][6 * i - 2] += ((-co - 1) * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
+                    Jjag[6 * i - 2][6 * i - 1] += (si * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
                     // Fz with respect to y and z
-                    dFAdX[6 * i - 1][6 * i - 2] = (si * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
-                    dFAdX[6 * i - 1][6 * i - 1] = ((co - 1) * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
+                    Jjag[6 * i - 1][6 * i - 2] += (si * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * si * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * (-co - 1) * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
+                    Jjag[6 * i - 1][6 * i - 1] += ((co - 1) * kl * (l - l0)) / (l0 * l) - (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1])) * (l - l0)) / (l0 * Math.Pow(l, 3)) + (0.5 * kl * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) * (2 * (co - 1) * (si * y[2 * i - 1] + co * z[2 * i - 1] - z[2 * i - 1]) + 2 * si * (-co * y[2 * i - 1] - y[2 * i - 1] + si * z[2 * i - 1]))) / (l0 * Math.Pow(l, 2));
                 }
             }
             #endregion
@@ -574,36 +486,36 @@ namespace AxiCodend
                     for (int j = 6; j > 0; j--)
                     {
                         // Fx with respect to x y z (this and previous node)
-                        dFBdX[6 * i - 3][6 * i - j] = 0;
+                        Jjag[6 * i - 3][6 * i - j] += 0;
                         // Fy with respect to x y z (this and previous node)
-                        dFBdX[6 * i - 2][6 * i - j] = 0;
+                        Jjag[6 * i - 2][6 * i - j] += 0;
                         // Fz with respect to x y z (this and previous node)
-                        dFBdX[6 * i - 1][6 * i - j] = 0;
+                        Jjag[6 * i - 1][6 * i - j] += 0;
                     }
                 }
                 else
                 {
                     // Fx with respect to x y z (this and previous node)
-                    dFBdX[6 * i - 3][6 * i - 6] = -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i - 1] - x[2 * i - 2]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 3][6 * i - 5] = -(km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 3][6 * i - 4] = -(km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 3][6 * i - 3] = (-km * (m - m0) / m0 / m + km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 3][6 * i - 2] = (km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 3][6 * i - 1] = -(-(km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2)));
+                    Jjag[6 * i - 3][6 * i - 6] += -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i - 1] - x[2 * i - 2]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 5] += -(km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 4] += -(km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 3] += (-km * (m - m0) / m0 / m + km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((x[2 * i - 1] - x[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 2] += (km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 1] += -(-(km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i - 2]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2)));
                     // Fy with respect to x y z (this and previous node)
-                    dFBdX[6 * i - 2][6 * i - 6] = -(-(km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2)));
-                    dFBdX[6 * i - 2][6 * i - 5] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 2][6 * i - 4] = -(km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 2][6 * i - 3] = -(km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 2][6 * i - 2] = (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 2][6 * i - 1] = (km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 6] += -(-(km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2)));
+                    Jjag[6 * i - 2][6 * i - 5] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 4] += -(km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 3] += -(km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (y[2 * i - 1] - y[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 2] += (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i - 1] - y[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 1] += (km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
                     // Fz with respect to x y z (this and previous node)
-                    dFBdX[6 * i - 1][6 * i - 6] = (km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 1][6 * i - 5] = -(km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 1][6 * i - 4] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 1][6 * i - 3] = -(km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 1][6 * i - 2] = (km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i - 1][6 * i - 1] = (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 6] += (km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 5] += -(km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 4] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 3] += -(km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 2] - x[2 * i - 1]) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 2] += (km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i - 1] - y[2 * i - 2])) * (z[2 * i - 1] - z[2 * i - 2]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 1] += (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i - 1] - z[2 * i - 2])), 2) / m0 / Math.Pow(m, 2));
                 }
             }
 
@@ -618,36 +530,36 @@ namespace AxiCodend
                     for (int j = 3; j > -3; j--)
                     {
                         // Fx with respect to x y z (this and previous node)
-                        dFBdX[6 * i + 0][6 * i - j] = 0;
+                        Jjag[6 * i + 0][6 * i - j] += 0;
                         // Fy with respect to x y z (this and previous node)
-                        dFBdX[6 * i + 1][6 * i - j] = 0;
+                        Jjag[6 * i + 1][6 * i - j] += 0;
                         // Fz with respect to x y z (this and previous node)
-                        dFBdX[6 * i + 2][6 * i - j] = 0;
+                        Jjag[6 * i + 2][6 * i - j] += 0;
                     }
                 }
                 else
                 {
                     // Fx with respect to x y z (this and previous node)
-                    dFBdX[6 * i + 0][6 * i - 3] = -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 0][6 * i - 2] = -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 0][6 * i - 1] = -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 0][6 * i - 0] = (-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 0][6 * i + 1] = (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 0][6 * i + 2] = (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i - 3] += -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i - 2] += -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i - 1] += -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i - 0] += (-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 1] += (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 2] += (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
                     // Fy with respect to x y z (this and previous node)
-                    dFBdX[6 * i + 1][6 * i - 3] = -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 1][6 * i - 2] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 1][6 * i - 1] = -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 1][6 * i - 0] = (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 1][6 * i + 1] = (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 1][6 * i + 2] = (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i - 3] += -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i - 2] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i - 1] += -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i - 0] += (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 1] += (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 2] += (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
                     // Fz with respect to x y z (this and previous node)
-                    dFBdX[6 * i + 2][6 * i - 3] = -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 2][6 * i - 2] = -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 2][6 * i - 1] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 2][6 * i - 0] = (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 2][6 * i + 1] = (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFBdX[6 * i + 2][6 * i + 2] = (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i - 3] += -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i - 2] += -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i - 1] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i - 0] += (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 1] += (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 2] += (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
                 }
             }
             #endregion
@@ -665,36 +577,36 @@ namespace AxiCodend
                     for (int j = 3; j > -3; j--)
                     {
                         // Fx with respect to x y z (this and next node)
-                        dFFdX[6 * i - 3][6 * i - j] = 0;
+                        Jjag[6 * i - 3][6 * i - j] += 0;
                         // Fy with respect to x y z (this and next node)
-                        dFFdX[6 * i - 2][6 * i - j] = 0;
+                        Jjag[6 * i - 2][6 * i - j] += 0;
                         // Fz with respect to x y z (this and next node)
-                        dFFdX[6 * i - 1][6 * i - j] = 0;
+                        Jjag[6 * i - 1][6 * i - j] += 0;
                     }
                 }
                 else
                 {
                     // Fx with respect to x y z (this and next node)
-                    dFFdX[6 * i - 3][6 * i - 3] = (-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 3][6 * i - 2] = (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 3][6 * i - 1] = (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 3][6 * i - 0] = -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 3][6 * i + 1] = -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 3][6 * i + 2] = -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 3] += (-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 2] += (km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 1] += (km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i - 0] += -(-km * (m - m0) / m0 / m + km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow((x[2 * i] - x[2 * i - 1]), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i + 1] += -(km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 3][6 * i + 2] += -(km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i] - x[2 * i - 1]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
                     // Fy with respect to x y z (this and next node)
-                    dFFdX[6 * i - 2][6 * i - 3] = -(km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 2][6 * i - 2] = (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 2][6 * i - 1] = (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 2][6 * i - 0] = (km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 2][6 * i + 1] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 2][6 * i + 2] = -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 3] += -(km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 2] += (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 1] += (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i - 0] += (km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (y[2 * i] - y[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i + 1] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i] - y[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 2][6 * i + 2] += -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
                     // Fz with respect to x y z (this and next node)
-                    dFFdX[6 * i - 1][6 * i - 3] = -(km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 1][6 * i - 2] = (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 1][6 * i - 1] = (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 1][6 * i - 0] = (km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 1][6 * i + 1] = -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i - 1][6 * i + 2] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 3] += -(km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 2] += (km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 1] += (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i - 0] += (km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i - 1] - x[2 * i]) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i + 1] += -(km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i] - y[2 * i - 1])) * (z[2 * i] - z[2 * i - 1]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i - 1][6 * i + 2] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i] - z[2 * i - 1])), 2) / m0 / Math.Pow(m, 2));
                 }
             }
 
@@ -709,53 +621,43 @@ namespace AxiCodend
                     for (int j = 0; j < 6; j++)
                     {
                         // Fx with respect to x y z (this and next node)
-                        dFFdX[6 * i + 0][6 * i + j] = 0;
+                        Jjag[6 * i + 0][6 * i + j] += 0;
                         // Fy with respect to x y z (this and next node)
-                        dFFdX[6 * i + 1][6 * i + j] = 0;
+                        Jjag[6 * i + 1][6 * i + j] += 0;
                         // Fz with respect to x y z (this and next node)
-                        dFFdX[6 * i + 2][6 * i + j] = 0;
+                        Jjag[6 * i + 2][6 * i + j] += 0;
                     }
                 }
                 else
                 {
                     // Fx with respect to x y z (this and next node)
-                    dFFdX[6 * i + 0][6 * i + 0] = (-km * (m - m0) / m0 / m + km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * (Math.Pow(x[2 * i + 1] - x[2 * i], 2) / m0 / Math.Pow(m, 2)));
-                    dFFdX[6 * i + 0][6 * i + 1] = (km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 0][6 * i + 2] = (km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 0][6 * i + 3] = -(-km * (m - m0) / m0 / m + km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 0][6 * i + 4] = -(km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 0][6 * i + 5] = -(km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 0] += (-km * (m - m0) / m0 / m + km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * (Math.Pow(x[2 * i + 1] - x[2 * i], 2) / m0 / Math.Pow(m, 2)));
+                    Jjag[6 * i + 0][6 * i + 1] += (km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 2] += (km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 3] += -(-km * (m - m0) / m0 / m + km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(x[2 * i + 1] - x[2 * i], 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 4] += -(km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 0][6 * i + 5] += -(km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
                     // Fy with respect to x y z (this and next node)
-                    dFFdX[6 * i + 1][6 * i + 0] = (km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 1][6 * i + 1] = (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 1][6 * i + 2] = (km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 1][6 * i + 3] = -(km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 1][6 * i + 4] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 1][6 * i + 5] = -(km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 0] += (km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 1] += (-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 2] += (km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 3] += -(km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (y[2 * i + 1] - y[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 4] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((y[2 * i + 1] - y[2 * i])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 1][6 * i + 5] += -(km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
                     // Fz with respect to x y z (this and next node)
-                    dFFdX[6 * i + 2][6 * i + 0] = (km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 2][6 * i + 1] = (km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 2][6 * i + 2] = (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 2][6 * i + 3] = -(km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 2][6 * i + 4] = -(km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
-                    dFFdX[6 * i + 2][6 * i + 5] = -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 0] += (km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 1] += (km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 2] += (-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 3] += -(km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * (x[2 * i + 1] - x[2 * i]) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 4] += -(km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) * (m - m0) / m0 / Math.Pow(m, 3) - km * ((y[2 * i + 1] - y[2 * i])) * (z[2 * i + 1] - z[2 * i]) / m0 / Math.Pow(m, 2));
+                    Jjag[6 * i + 2][6 * i + 5] += -(-km * (m - m0) / m0 / m + km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) * (m - m0) / m0 / Math.Pow(m, 3) - km * Math.Pow(((z[2 * i + 1] - z[2 * i])), 2) / m0 / Math.Pow(m, 2));
                 }
             }
             #endregion
-            
-            //dFTdX = dFAdX.Add(dFFdX.Add(dFBdX));    // dFTdX = dFAdX + dFFdX + dFBdX collect all contributions at each node
-            BandAdd3(ref dFTdX, dFAdX, dFFdX, dFBdX);
-            return dFTdX;
         }
 
-        public double[][] GetCatchJacobian(double[] X)
+        private void SetCatchJacobianJagged()
         {
-            for (int i = 0; i < dof; i++)
-            {
-                Array.Clear(dFFdX[i], 0, dFFdX[i].Length);
-                Array.Clear(dFBdX[i], 0, dFBdX[i].Length);
-            }
-
             for (int i = 0; i < dof / 3; i++)
             {
                 x[i] = X[3 * i];
@@ -771,50 +673,50 @@ namespace AxiCodend
                 if (i == 2 * nx + 1)   // very last point
                 {
                     // Fx with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 3][3 * i - 6] = 0;
-                    dFBdX[3 * i - 3][3 * i - 5] = pi * 0.25 * P / nr * 2 * y[i - 2];
-                    dFBdX[3 * i - 3][3 * i - 4] = pi * 0.25 * P / nr * 2 * z[i - 2];
-                    dFBdX[3 * i - 3][3 * i - 3] = 0;
-                    dFBdX[3 * i - 3][3 * i - 2] = pi * 0.25 * P / nr * (-2 * y[i - 1]);
-                    dFBdX[3 * i - 3][3 * i - 1] = pi * 0.25 * P / nr * (-2 * z[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 6] += 0;
+                    Jjag[3 * i - 3][3 * i - 5] += pi * 0.25 * P / nr * 2 * y[i - 2];
+                    Jjag[3 * i - 3][3 * i - 4] += pi * 0.25 * P / nr * 2 * z[i - 2];
+                    Jjag[3 * i - 3][3 * i - 3] += 0;
+                    Jjag[3 * i - 3][3 * i - 2] += pi * 0.25 * P / nr * (-2 * y[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 1] += pi * 0.25 * P / nr * (-2 * z[i - 1]);
                     // Fy with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 2][3 * i - 6] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (-(r[i - 2] + r[i - 1]));
-                    dFBdX[3 * i - 2][3 * i - 5] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 2] / r[i - 2]);
-                    dFBdX[3 * i - 2][3 * i - 4] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 2] / r[i - 2]);
-                    dFBdX[3 * i - 2][3 * i - 3] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (r[i - 1] + r[i - 2]);
-                    dFBdX[3 * i - 2][3 * i - 2] = 0;
-                    dFBdX[3 * i - 2][3 * i - 1] = 0;
+                    Jjag[3 * i - 2][3 * i - 6] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (-(r[i - 2] + r[i - 1]));
+                    Jjag[3 * i - 2][3 * i - 5] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 2] / r[i - 2]);
+                    Jjag[3 * i - 2][3 * i - 4] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 2] / r[i - 2]);
+                    Jjag[3 * i - 2][3 * i - 3] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (r[i - 1] + r[i - 2]);
+                    Jjag[3 * i - 2][3 * i - 2] += 0;
+                    Jjag[3 * i - 2][3 * i - 1] += 0;
                     // Fz with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 1][3 * i - 6] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (-(r[i - 2] + r[i - 1]));
-                    dFBdX[3 * i - 1][3 * i - 5] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 2] / r[i - 2]);
-                    dFBdX[3 * i - 1][3 * i - 4] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 2] / r[i - 2]);
-                    dFBdX[3 * i - 1][3 * i - 3] = 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (r[i - 1] + r[i - 2]);
-                    dFBdX[3 * i - 1][3 * i - 2] = 0;
-                    dFBdX[3 * i - 1][3 * i - 1] = 0;
+                    Jjag[3 * i - 1][3 * i - 6] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (-(r[i - 2] + r[i - 1]));
+                    Jjag[3 * i - 1][3 * i - 5] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 2] / r[i - 2]);
+                    Jjag[3 * i - 1][3 * i - 4] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 2] / r[i - 2]);
+                    Jjag[3 * i - 1][3 * i - 3] += 1 / Math.Pow(2, 0.5) * pi * 0.25 * P / nr * (r[i - 1] + r[i - 2]);
+                    Jjag[3 * i - 1][3 * i - 2] += 0;
+                    Jjag[3 * i - 1][3 * i - 1] += 0;
                 }
                 else                   // pressure backward starting from npp+1
                 {
                     // Fx with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 3][3 * i - 6] = 0;
-                    dFBdX[3 * i - 3][3 * i - 5] = pi * 0.25 * P / nr * 2 * y[i - 2];
-                    dFBdX[3 * i - 3][3 * i - 4] = pi * 0.25 * P / nr * 2 * z[i - 2];
-                    dFBdX[3 * i - 3][3 * i - 3] = 0;
-                    dFBdX[3 * i - 3][3 * i - 2] = pi * 0.25 * P / nr * (-2 * y[i - 1]);
-                    dFBdX[3 * i - 3][3 * i - 1] = pi * 0.25 * P / nr * (-2 * z[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 6] += 0;
+                    Jjag[3 * i - 3][3 * i - 5] += pi * 0.25 * P / nr * 2 * y[i - 2];
+                    Jjag[3 * i - 3][3 * i - 4] += pi * 0.25 * P / nr * 2 * z[i - 2];
+                    Jjag[3 * i - 3][3 * i - 3] += 0;
+                    Jjag[3 * i - 3][3 * i - 2] += pi * 0.25 * P / nr * (-2 * y[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 1] += pi * 0.25 * P / nr * (-2 * z[i - 1]);
                     // Fy with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 2][3 * i - 6] = pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
-                    dFBdX[3 * i - 2][3 * i - 5] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * y[i - 2] / r[i - 1] / r[i - 2]);
-                    dFBdX[3 * i - 2][3 * i - 4] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 2] / r[i - 1] / r[i - 2]);
-                    dFBdX[3 * i - 2][3 * i - 3] = pi * 0.25 * P / nr * (y[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
-                    dFBdX[3 * i - 2][3 * i - 2] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * (r[i - 2] + r[i - 1]) / r[i - 1] - (x[i - 1] - x[i - 2]) * Math.Pow(y[i - 1], 2) * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i - 1] - x[i - 2]) * Math.Pow(y[i - 1], 2) / Math.Pow(r[i - 1], 2));
-                    dFBdX[3 * i - 2][3 * i - 1] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3));
+                    Jjag[3 * i - 2][3 * i - 6] += pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 5] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * y[i - 2] / r[i - 1] / r[i - 2]);
+                    Jjag[3 * i - 2][3 * i - 4] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 2] / r[i - 1] / r[i - 2]);
+                    Jjag[3 * i - 2][3 * i - 3] += pi * 0.25 * P / nr * (y[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 2] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * (r[i - 2] + r[i - 1]) / r[i - 1] - (x[i - 1] - x[i - 2]) * Math.Pow(y[i - 1], 2) * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i - 1] - x[i - 2]) * Math.Pow(y[i - 1], 2) / Math.Pow(r[i - 1], 2));
+                    Jjag[3 * i - 2][3 * i - 1] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3));
                     // Fz with respect to x y z (this and previous node)
-                    dFBdX[3 * i - 1][3 * i - 6] = pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
-                    dFBdX[3 * i - 1][3 * i - 5] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 1] * y[i - 2] / r[i - 1] / r[i - 2]);
-                    dFBdX[3 * i - 1][3 * i - 4] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 1] * z[i - 2] / r[i - 1] / r[i - 2]);
-                    dFBdX[3 * i - 1][3 * i - 3] = pi * 0.25 * P / nr * (z[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
-                    dFBdX[3 * i - 1][3 * i - 2] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3));
-                    dFBdX[3 * i - 1][3 * i - 1] = pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * (r[i - 2] + r[i - 1]) / r[i - 1] - (x[i - 1] - x[i - 2]) * Math.Pow(z[i - 1], 2) * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i - 1] - x[i - 2]) * Math.Pow(z[i - 1], 2) / Math.Pow(r[i - 1], 2));
+                    Jjag[3 * i - 1][3 * i - 6] += pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 5] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 1] * y[i - 2] / r[i - 1] / r[i - 2]);
+                    Jjag[3 * i - 1][3 * i - 4] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * z[i - 1] * z[i - 2] / r[i - 1] / r[i - 2]);
+                    Jjag[3 * i - 1][3 * i - 3] += pi * 0.25 * P / nr * (z[i - 1] * (r[i - 2] + r[i - 1]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 2] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i - 1] - x[i - 2]) * y[i - 1] * z[i - 1] * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3));
+                    Jjag[3 * i - 1][3 * i - 1] += pi * 0.25 * P / nr * ((x[i - 1] - x[i - 2]) * (r[i - 2] + r[i - 1]) / r[i - 1] - (x[i - 1] - x[i - 2]) * Math.Pow(z[i - 1], 2) * (r[i - 2] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i - 1] - x[i - 2]) * Math.Pow(z[i - 1], 2) / Math.Pow(r[i - 1], 2));
                 }
             }
             #endregion
@@ -826,73 +728,182 @@ namespace AxiCodend
                 if (i == 2 * nx)   // pre last point
                 {
                     // Fx with respect to x y z (this and next node)
-                    dFFdX[3 * i - 3][3 * i - 3] = pi * 0.25 * P / nr * (0);
-                    dFFdX[3 * i - 3][3 * i - 2] = pi * 0.25 * P / nr * (2 * y[i - 1]);
-                    dFFdX[3 * i - 3][3 * i - 1] = pi * 0.25 * P / nr * (2 * z[i - 1]);
-                    dFFdX[3 * i - 3][3 * i - 0] = pi * 0.25 * P / nr * (0);
-                    dFFdX[3 * i - 3][3 * i + 1] = pi * 0.25 * P / nr * (-2 * y[i]);
-                    dFFdX[3 * i - 3][3 * i + 2] = pi * 0.25 * P / nr * (-2 * z[i]);
+                    Jjag[3 * i - 3][3 * i - 3] += pi * 0.25 * P / nr * (0);
+                    Jjag[3 * i - 3][3 * i - 2] += pi * 0.25 * P / nr * (2 * y[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 1] += pi * 0.25 * P / nr * (2 * z[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 0] += pi * 0.25 * P / nr * (0);
+                    Jjag[3 * i - 3][3 * i + 1] += pi * 0.25 * P / nr * (-2 * y[i]);
+                    Jjag[3 * i - 3][3 * i + 2] += pi * 0.25 * P / nr * (-2 * z[i]);
                     // Fy with respect to x y z (this and next node)
-                    dFFdX[3 * i - 2][3 * i - 3] = pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i - 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) / Math.Pow(r[i - 1], 2));
-                    dFFdX[3 * i - 2][3 * i - 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3));
-                    dFFdX[3 * i - 2][3 * i - 0] = pi * 0.25 * P / nr * (y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i + 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i + 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 3] += pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) / Math.Pow(r[i - 1], 2));
+                    Jjag[3 * i - 2][3 * i - 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3));
+                    Jjag[3 * i - 2][3 * i - 0] += pi * 0.25 * P / nr * (y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i + 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i + 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] / r[i - 1]);
                     // Fz with respect to x y z (this and next node)
-                    dFFdX[3 * i - 1][3 * i - 3] = pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i - 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3));
-                    dFFdX[3 * i - 1][3 * i - 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) / Math.Pow(r[i - 1], 2));
-                    dFFdX[3 * i - 1][3 * i - 0] = pi * 0.25 * P / nr * (z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i + 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i + 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 3] += pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow(r[i - 1], 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3));
+                    Jjag[3 * i - 1][3 * i - 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow(r[i - 1], 3) + (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) / Math.Pow(r[i - 1], 2));
+                    Jjag[3 * i - 1][3 * i - 0] += pi * 0.25 * P / nr * (z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i + 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i + 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] / r[i - 1]);
                 }
                 else        // pressure backward starting from npp+1
                 {
                     // Fx with respect to x y z (this and next node)
-                    dFFdX[3 * i - 3][3 * i - 3] = pi * 0.25 * P / nr * (0);
-                    dFFdX[3 * i - 3][3 * i - 2] = pi * 0.25 * P / nr * (2 * y[i - 1]);
-                    dFFdX[3 * i - 3][3 * i - 1] = pi * 0.25 * P / nr * (2 * z[i - 1]);
-                    dFFdX[3 * i - 3][3 * i - 0] = pi * 0.25 * P / nr * (0);
-                    dFFdX[3 * i - 3][3 * i + 1] = pi * 0.25 * P / nr * (-2 * y[i]);
-                    dFFdX[3 * i - 3][3 * i + 2] = pi * 0.25 * P / nr * (-2 * z[i]);
+                    Jjag[3 * i - 3][3 * i - 3] += pi * 0.25 * P / nr * (0);
+                    Jjag[3 * i - 3][3 * i - 2] += pi * 0.25 * P / nr * (2 * y[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 1] += pi * 0.25 * P / nr * (2 * z[i - 1]);
+                    Jjag[3 * i - 3][3 * i - 0] += pi * 0.25 * P / nr * (0);
+                    Jjag[3 * i - 3][3 * i + 1] += pi * 0.25 * P / nr * (-2 * y[i]);
+                    Jjag[3 * i - 3][3 * i + 2] += pi * 0.25 * P / nr * (-2 * z[i]);
                     // Fy with respect to x y z (this and next node)
-                    dFFdX[3 * i - 2][3 * i - 3] = pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i - 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3) + (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) / Math.Pow((r[i - 1]), 2));
-                    dFFdX[3 * i - 2][3 * i - 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow((r[i - 1]), 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3));
-                    dFFdX[3 * i - 2][3 * i - 0] = pi * 0.25 * P / nr * (y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i + 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i] * y[i - 1] / r[i] / r[i - 1]);
-                    dFFdX[3 * i - 2][3 * i + 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i] / r[i] / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 3] += pi * 0.25 * P / nr * (-y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i - 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3) + (x[i] - x[i - 1]) * Math.Pow(y[i - 1], 2) / Math.Pow((r[i - 1]), 2));
+                    Jjag[3 * i - 2][3 * i - 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow((r[i - 1]), 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3));
+                    Jjag[3 * i - 2][3 * i - 0] += pi * 0.25 * P / nr * (y[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i + 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i] * y[i - 1] / r[i] / r[i - 1]);
+                    Jjag[3 * i - 2][3 * i + 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i] / r[i] / r[i - 1]);
                     // Fz with respect to x y z (this and next node)
-                    dFFdX[3 * i - 1][3 * i - 3] = pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i - 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow((r[i - 1]), 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3));
-                    dFFdX[3 * i - 1][3 * i - 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3) + (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) / Math.Pow((r[i - 1]), 2));
-                    dFFdX[3 * i - 1][3 * i - 0] = pi * 0.25 * P / nr * (z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i + 1] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i] * z[i - 1] / r[i] / r[i - 1]);
-                    dFFdX[3 * i - 1][3 * i + 2] = pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] * z[i] / r[i] / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 3] += pi * 0.25 * P / nr * (-z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i - 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i - 1] * z[i - 1] / Math.Pow((r[i - 1]), 2) - (x[i] - x[i - 1]) * y[i - 1] * z[i - 1] * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3));
+                    Jjag[3 * i - 1][3 * i - 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * (r[i] + r[i - 1]) / r[i - 1] - (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) * (r[i] + r[i - 1]) / Math.Pow((r[i - 1]), 3) + (x[i] - x[i - 1]) * Math.Pow(z[i - 1], 2) / Math.Pow((r[i - 1]), 2));
+                    Jjag[3 * i - 1][3 * i - 0] += pi * 0.25 * P / nr * (z[i - 1] * (r[i - 1] + r[i]) / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i + 1] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * y[i] * z[i - 1] / r[i] / r[i - 1]);
+                    Jjag[3 * i - 1][3 * i + 2] += pi * 0.25 * P / nr * ((x[i] - x[i - 1]) * z[i - 1] * z[i] / r[i] / r[i - 1]);
                 }
             }
             #endregion
 
-            //dFCdX = dFFdX.Add(dFBdX); // dFCdX = dFFdX + dFBdX collect all contributions at each node
-            //Print(dFFdX, new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }, new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-            BandAdd2(ref dFCdX, dFFdX, dFBdX);
-            return dFCdX;
         }
 
-        public double[][] GetTotalJacobian(double[] X)
+        private void ApplyBCtoJacobian()
         {
-            dFTdX = GetTwineJacobian(X);
-            dFCdX = GetCatchJacobian(X);
+            // really inefficient way to do it!
+            Jjag[0] = new double[dof];
+            Jjag[1] = new double[dof];
+            Jjag[2] = new double[dof];
+            Jjag[dof - 1] = new double[dof];
+            Jjag[dof - 2] = new double[dof];
+            Jjag[0][0] = Jjag[1][1] = Jjag[2][2] = Jjag[dof - 2][dof - 2] = Jjag[dof - 1][dof - 1] = -1;
 
-            //dFdX = dFTdX.Add(dFCdX);            /*Add elastic twine jacobian and catch presure jacobian*/
+            for (int i = 3; i < 6; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    Jjag[i][j] = 0;
+                }
+            }
 
-            BandAdd2(ref dFdX, dFTdX, dFCdX);
+            for (int i = dof - 6; i < dof - 2; i++)
+            {
+                for (int j = dof - 2; j < dof; j++)
+                {
+                    Jjag[i][j] = 0;
+                }
+            }
 
-            return dFdX;
+            //Print(Jjag, new int[] { dof - 8, dof - 7, dof - 6, dof - 5, dof - 4, dof - 3, dof - 2, dof - 1 },
+            //            new int[] { dof - 8, dof - 7, dof - 6, dof - 5, dof - 4, dof - 3, dof - 2, dof - 1 });
         }
 
-            /* printing*/
+        public override void UpdateTotalJacobian(double kDiag, bool IncludeBC)
+        {
+            for (int i = 0; i < dof; i++)
+            {
+                Array.Clear(Jjag[i], 0, Jjag[i].Length);
+            }
+
+            SetTwineJacobianJagged();
+            SetCatchJacobianJagged();
+
+            if (IncludeBC)
+            {
+                ApplyBCtoJacobian();
+            }
+
+            if (kDiag != 0)
+            {
+                for (int i = 0; i < dof; i++)
+                {
+                    Jjag[i][i] += kDiag;
+                }
+            }
+
+            J = Converter.ToCompressedColumnStorage(Jjag);
+        }
+
+
+
+        public override double Length()
+        {
+            return X[dof - 3];                      // total length is last x
+        }
+
+        public override double MaxRadius()
+        {
+            for (int i = 0; i < dof / 3; i++)
+            {
+                r[i] = Math.Sqrt(Math.Pow(X[3 * i + 1], 2) + Math.Pow(X[3 * i + 2], 2));
+            }
+
+            double rMax = r0;                           // maximum radius
+
+            for (int i = 1; i < dof / 3; i++)
+            {
+                if (rMax < r[i])
+                {
+                    rMax = r[i];
+                }
+            }
+            return rMax;
+        }
+
+        public override double EntranceDrag()
+        {
+            UpdateTotalForces(IncludeBC: false);
+            return 2 * nr * F[0];
+        }
+
+        public override double CatchDrag()
+        {
+            double rCatch = r[ncp - 1];
+            return pi * Math.Pow(rCatch, 2) * P;
+        }
+
+        public override double CatchThickness()
+        {
+            // catch length difference between last x and x where catch starts
+            return X[dof - 3] - X[3 * ncp - 3];
+        }
+
+        public override double CatchVolume()
+        {
+            double V = 0;                               // volume of the catch
+
+            // volume of a cut cone between 2 nodes
+            for (int i = ncp; i < dof / 3; i++)
+            {
+                V = V + pi * (X[3 * i] - X[3 * i - 3]) * (Math.Pow(r[i], 2) + r[i] * r[i - 1] + Math.Pow(r[i - 1], 2)) / 3;
+            }
+            return V;
+        }
+
+        public override double CatchSurface()
+        {
+            double S = 0;                               // surface area affected by catch
+
+            // surface area of a cut cone between 2 nodes
+            for (int i = ncp; i < dof / 3; i++)
+            {
+                S = S + pi * (r[i] + r[i - 1]) * Math.Pow(Math.Pow(r[i - 1] - r[i], 2) + 
+                                                 Math.Pow(X[3 * i] - X[3 * i - 3], 2), 0.5);
+            }
+            return S;
+        }
+
+        /* printing*/
 
         public void Print(double[] Array)
         {
@@ -917,66 +928,6 @@ namespace AxiCodend
             }
         }
 
-        public void PrintResults(double[] X)
-        {
-            for (int i = 0; i < dof / 3; i++)
-            {
-                r[i] = Math.Sqrt(Math.Pow(X[3 * i + 1], 2) + Math.Pow(X[3 * i + 2], 2));
-            }
-
-            /*Maximum radius and total length*/
-            #region
-            double L = X[dof - 3];                      // total length is last x
-            double rCatch = r[ncp - 1];                 // radius at the beginning of the catch
-            double rMax = r0;                           // maximum radius
-
-            for (int i = 1; i < dof / 3; i++)
-            {
-                if (rMax < r[i])
-                {
-                    rMax = r[i];
-                }
-            }
-            #endregion
-
-            /* Get beginnig reaction and drag force on the catch*/
-            #region
-
-            UpdateTotalForces(IncludeBC: false);
-            double begR = 2 * nr * F[0];                               // resultant entrance reaction
-            double dragR = pi * Math.Pow(rCatch, 2) * P;               // resultant catch drag
-
-            #endregion
-
-            /*Length, surface area and volume covered by the catch*/
-            #region
-            double Lc = X[dof - 3] - X[3 * ncp - 3];    // catch length difference between last x and x where catch starts
-
-            double S = 0;                               // surface area affected by catch
-            double V = 0;                               // volume of the catch
-
-            for (int i = ncp; i < dof / 3; i++)         // surface area of a cut cone between 2 nodes
-            {                                           // volume of a cut cone between 2 nodes
-                S = S + pi * (r[i] + r[i-1]) * Math.Pow(Math.Pow(r[i-1] - r[i], 2) + Math.Pow(X[3 * i] - X[3 * i - 3], 2), 0.5);
-                V = V + pi * (X[3 * i] - X[3 * i - 3]) * (Math.Pow(r[i], 2) + r[i] * r[i - 1] + Math.Pow(r[i - 1], 2)) / 3;
-            }
-
-            #endregion
-
-            /*Print all in a table*/
-            #region
-            Console.WriteLine("\nResults:");
-            Console.WriteLine("Total codend length:             {0,10:N3} [m]", L);
-            Console.WriteLine("Maximum codend radius:           {0,10:N3} [m]", rMax);
-            Console.WriteLine("Catch extent:                    {0,10:N3} [m]", Lc);
-            Console.WriteLine("Surface in contact with catch:   {0,10:N3} [m^2]", S);
-            Console.WriteLine("Catch volume:                    {0,10:N3} [m^3]", V);
-            Console.WriteLine("Resultant entrance reaction:     {0,10:N0} [N]", begR);
-            Console.WriteLine("Total drag force:                {0,10:N0} [N]\n", dragR);
-            #endregion
-
-        }
-
         public void PrintIter(int iter, int funEval, double addStiff, double R)
         {
             Console.WriteLine(String.Format("Iteration: {0,-10:D} " +
@@ -984,6 +935,5 @@ namespace AxiCodend
                                 "Added stiffness: {2,-10:N3} " +
                                 "Force residue: {3,-10:e3}", iter, funEval, addStiff, R));
         }
-
     }
 }

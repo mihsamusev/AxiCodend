@@ -17,7 +17,7 @@ namespace AxiCodend
 
             try
             {
-                Console.WindowWidth = 100;
+                Console.WindowWidth = 160;
                 Console.WindowHeight = 50;
             }
             catch
