@@ -1,6 +1,5 @@
 # AxiCodend
-Simulation of trawl-cod shapes during the towing using axis-symmetric numerical model (see atached paper and thesis).
-Input happens throught the "input.txt" file, and should follow the format:
+Simulation of trawl cod-end shapes during the towing using an object-oriented C# version of axis-symmetric numerical model developed by D.Priour (see atached paper and thesis). Input happens throught the "input.txt" file, and should follow the format:
 
 *Block of paths (essential input) contains the paths where the results are stored, the input is by default input.txt and has to be in the same directory as .exe file*
 ```
