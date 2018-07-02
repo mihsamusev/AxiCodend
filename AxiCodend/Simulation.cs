@@ -10,10 +10,10 @@ namespace AxiCodend
     class Simulation
     {
         //============================
-        // fields
+        // VARIABLES
         //============================
 
-        public AxiModelT0 Codend;
+        public AxiCodend Codend;
         public Towing Towing;
         public Catch Catch;
         public SolverSettings SolverSettings { get; set; }
@@ -22,10 +22,10 @@ namespace AxiCodend
         private double[] previousX;
 
         //============================
-        // constructor
+        // CONSTRUCTOR
         //============================
 
-        public Simulation(AxiModelT0 Codend, Catch Catch, Towing Towing)
+        public Simulation(AxiCodend Codend, Catch Catch, Towing Towing)
         {
             this.Codend = Codend;
             this.Catch = Catch;
@@ -37,7 +37,7 @@ namespace AxiCodend
         }
 
         //============================
-        // methods
+        // METHODS
         //============================
 
         private double DisplacmentNorm(double[] h)
@@ -55,7 +55,7 @@ namespace AxiCodend
             /*Check if precalculation of the initial shape is requred*/
             bool usePrecalc = false;
 
-            if (Codend.nc < SolverSettings.MinCatchBlock) // due to low catch
+            if (Codend.GetMeshesBlocked() < SolverSettings.MinCatchBlock) // due to low catch
             {
                 Codend.ApplyCatch(SolverSettings.MinCatchBlock);
                 Console.WriteLine("\nCodend is too empty, using {0} meshes blocked by catch instead to precalculate initial shape.\n",SolverSettings.MinCatchBlock);
@@ -111,7 +111,7 @@ namespace AxiCodend
                 return true;
             }
 
-            double Ranalytical = 2 * Codend.nr * 0.5 * Codend.Material.MeshSide / (Math.PI * Math.Sqrt(6));
+            double Ranalytical = 2 * Codend.GetMeshesAround() * 0.5 * Codend.Material.MeshSide / (Math.PI * Math.Sqrt(6));
             double tol = 2;
 
             if (Codend.MaxRadius() > tol * Ranalytical)
@@ -119,7 +119,7 @@ namespace AxiCodend
                 return true;
             }
 
-            double stretchedLength = Codend.nx * (Codend.Material.MeshSide + 2 * Codend.Material.KnotSize);
+            double stretchedLength = Codend.GetMeshesAlong() * (Codend.Material.MeshSide + 2 * Codend.Material.KnotSize);
             if (Codend.Length() > stretchedLength)
             {
                 return true;
@@ -135,7 +135,7 @@ namespace AxiCodend
 
             double[] h = new double[Codend.dof];
             double PrevTowSpeed = Codend.towSpeed;
-            int PrevCatch = Codend.nc;
+            int PrevCatch = Codend.GetMeshesBlocked();
 
             SparseLU LU;
             var LUorder = ColumnOrdering.MinimumDegreeAtPlusA;
