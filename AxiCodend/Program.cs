@@ -69,16 +69,11 @@ namespace AxiCodend
             };
 
             TowingSimulation.Simulate();
-
-            //if (!Console.IsOutputRedirected)
-            //{
-            //    Console.WriteLine("Press any key to close.");
-            //    Console.ReadKey();
-            //}
         }
-        
-        // Static methods 
-        //=======================================================================
+
+
+        // Static methods (old)
+        #region
 
         static string GetExePath()
         {
@@ -208,5 +203,6 @@ namespace AxiCodend
                     Console.WriteLine("{0,10:F4}", A[j]);
                 }
         }
+        #endregion
     }
 }
