@@ -47,11 +47,11 @@ namespace AxiCodend
        
             if (hexMeshPanel.MeshOrientation == 0)
             {
-                codend = new AxiModelT0(path);   // To start with initialize T0 model
+                codend = new AxiModelT0(path);   // initialize T0 model
             }
             else if(hexMeshPanel.MeshOrientation == 90)
             {
-                //codend = new AxiModelT90(path);   // To start with initialize T0 model
+                codend = new AxiModelT90(path);   // initialize T90 model
             }
             else
             {

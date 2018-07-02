@@ -10,7 +10,7 @@ namespace AxiCodend
     class Simulation
     {
         //============================
-        // fields
+        // VARIABLES
         //============================
 
         public AxiCodend Codend;
@@ -22,7 +22,7 @@ namespace AxiCodend
         private double[] previousX;
 
         //============================
-        // constructor
+        // CONSTRUCTOR
         //============================
 
         public Simulation(AxiCodend Codend, Catch Catch, Towing Towing)
@@ -37,7 +37,7 @@ namespace AxiCodend
         }
 
         //============================
-        // methods
+        // METHODS
         //============================
 
         private double DisplacmentNorm(double[] h)

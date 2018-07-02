@@ -8,6 +8,10 @@ namespace AxiCodend
 {
     class AxiModelT0 : AxiCodend
     {
+        //====================
+        // CLASS VARIABLES
+        //====================
+
         private const int nbc_beg = 2;	// nb of fixed dof at entry (x0 r0)
         private const int nbc_end = 1;    // nb of fixed dof at the end (rn)
 
@@ -16,7 +20,7 @@ namespace AxiCodend
 
         /*help figures and help variables*/
         #region
-        double a1, a2, a3, a4, a5, a6, l10, l11;
+        private double a1, a2, a3, a4, a5, a6, l10, l11;
 
         // neigbour points (local dof) to the left and to the right of "a"
         //					
@@ -26,7 +30,7 @@ namespace AxiCodend
         //       ________/           \________     -> current
         // (a1,a2) l10  (a3,a4) 
         //
-        double b1, b2, b3, b4, b5, b6, l21, l22;
+        private double b1, b2, b3, b4, b5, b6, l21, l22;
 
         // neigbour points (local dof) to the left and to the right of "b"
         //					
@@ -36,7 +40,7 @@ namespace AxiCodend
         //       ________/           \________     -> current
         //			  (b1,b2) 
         //
-        double c1, c2, c3, c4, c5, c6, l33;
+        private double c1, c2, c3, c4, c5, c6, l33;
 
         // neigbour points (local dof) to the left and to the right of "c"
         //					
@@ -46,7 +50,7 @@ namespace AxiCodend
         //       ________/           \________     -> current
         //						(c5,c6) 
         //
-        double d1, d2, d3, d4, d5, d6, l44;
+        private double d1, d2, d3, d4, d5, d6, l44;
 
         // neigbour points (local dof) to the left and to the right of "d"
         //					
@@ -58,112 +62,38 @@ namespace AxiCodend
         //
         #endregion
 
-        // CLASS CONSTRUCTS
+        //====================
+        // CLASS CONSTRUCTOR
+        //====================
 
         public AxiModelT0(int nx, int nr, double r0, HexMeshPanelMaterial Material) : base(nx, nr, r0, Material)
         {
-            InitDOF();                  // dof number                 
-            InitBlockedMeshes();        // blocked meshes 
-            ClearState();               // initialize FE vectors and matrices
-            SetAngles();                // set angles and trigonometric functions
+
         }
 
         public AxiModelT0(PathsIO path) : base(path)
         {          
-            LoadInput(path);            // read from input file
-            InitDOF();                  // dof number                 
-            InitBlockedMeshes();        // blocked meshes 
-            ClearState();               // initialize FE vectors and matrices
-            SetAngles();                // set angles and trigonometric functions
+            
         }
 
 
+        //====================
         // CLASS METHODS
+        //====================
 
-        private void LoadInput(PathsIO path)
-        {
-            string[] names = { "MeshSide", "KnotSize", "TwineEA", "KnotEA",
-                               "MeshesAlong", "MeshesAround", "EntranceRadius" };
-            string[] lines = File.ReadAllLines(path.input);
-            string[] parts;
-            int currentLine = 0;
-            int foundCount = 0;
+        /* for updating/initializing*/
 
-            Material = new HexMeshPanelMaterial(path);
-
-            foreach (var line in lines)
-            {
-                if (line.Contains(names[0]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    m0 = Convert.ToDouble(parts[1]) / 2;
-                    foundCount++;
-                }
-
-                if (line.Contains(names[1]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    l0 = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[2]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    km = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[3]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    kl = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[4]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    nx = Convert.ToInt32(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[5]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    nr = Convert.ToInt32(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[6]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    r0 = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-                currentLine++;
-            }
-
-            if (foundCount != 7)
-            {
-                throw new ArgumentException("Not all fields could be initialized, " +
-                                            "because the input file is not in the right format");
-            }
-        }
-
-        /* for updating*/
-
-        protected override void InitDOF()
+        protected override void SetDOF()
         {
             dof = nx * 8 + 2;           // dof number  
         }
 
-        protected override void InitBlockedMeshes()
+        protected override void SetBlockedMeshes()
         {
-            ncp = 1 + 4 * nx - 4 * nc;  // blocked meshes 
+            ncp = 1 + 4 * nx - 4 * nc;  // nodes affected by catch
         }
 
-        private void SetAngles()
+        protected override void SetAngles()
         {
             theta = pi / nr;
             co = Math.Cos(theta);
@@ -191,13 +121,13 @@ namespace AxiCodend
         public override void ApplyCatch(int newCatch)
         {
             nc = newCatch;
-            ncp = 1 + 4 * nx - 4 * nc;
+            ncp = 1 + 4 * nx - 4 * nc; // nodes affected by catch
         }
 
         public override void ApplyTowing(double newSpeed)
         {
             towSpeed = newSpeed;
-            P = 0.5 * 1.4 * 1025.0 * Math.Pow(towSpeed, 2);
+            P = 0.5 * catchCd * rhoWater * Math.Pow(towSpeed, 2);
         }
 
         /* initial shape*/

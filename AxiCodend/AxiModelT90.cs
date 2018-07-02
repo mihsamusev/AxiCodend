@@ -2,11 +2,31 @@
 using Accord.Math;
 using System.IO;
 using System.Collections.Generic;
+using CSparse.Storage;
+using CSparse;
 
 namespace AxiCodend
 {
-    public class AxiModelT90
+    class AxiModelT90 : AxiCodend
     {
+
+
+        //====================
+        // CLASS VARIABLES
+        //====================
+
+
+        /* calculation variables*/
+
+        public readonly int nbc_beg = 3;	        // nb of fixed dof at entry (x1 y1 z1)
+        public readonly int nbc_end = 2;            // nb of fixed dof at the end (yn zn)
+
+        const double pi = Math.PI;
+       
+        private double theta, co, si;               // angle in circumference covered by 1 mesh
+                                                    // sin cos of single and double theta
+        /*help figures and help variables*/
+        #region
         //
         //
         //                  
@@ -19,92 +39,39 @@ namespace AxiCodend
         //            /    \/    \
         //                     
         //
-        // CLASS VARIABLES
-        #region
-        /*mesh characteristics*/
-
-        private double l0;           // length of un-stretched knot       
-        private double m0;           // length of un-stretched twine
-        private double kl;           // stiffness of a knot
-        private double km;           // stiffness of a twine
-
-        /*codend paramters*/
-
-        private int nx;              // amount of meshes along the codend length
-        private int nr;              // amount of meshes in the codend`s circumference
-        private int nc;              // moundt of meshes along the codend length contatining catch 
-        private double r0;           // entrance radius
-
-        /*operation*/
-
-        private double P; // catch pressure
+        private double l, m;                        // length of twine and knot between 2 points, for calculation
         #endregion
 
-        /* calculation variables*/
-        #region
-        public readonly int dof;                    // nb of dof
-        public readonly int nbc_beg = 3;	        // nb of fixed dof at entry (x1 y1 z1)
-        public readonly int nbc_end = 2;            // nb of fixed dof at the end (yn zn)
 
-        const double pi = Math.PI;
-        private int ncp;                            // node number indicating start of application of the catch pressure
-        private double theta, co, si;               // angle in circumference covered by 1 mesh
-                                                    // sin cos of single and double theta
-        private double R;                           // residue
-        private double l, m;                        // length of twine and knot between 2 points, for calculation
-
-        private double[] X0,x,y,z,r,                // initial shape, coordinates and radii vectors
-                         FA,FB,FF,                  // helper force vectors (force from twines going around, backward, forward)
-                         FT,FC,F;                   // twine force, catch force and total force vectors
+        private double[] x, y, z, r;                // initial shape, coordinates and radii vectors
         private double[][] dFAdX,dFBdX,dFFdX,       // helper jacobian matrices (stiffness from twines going around, backward, forward) 
                            dFTdX,dFCdX,dFdX;        // jacobian due to twine force, catch force and total force
 
+        //====================
+        // CLASS CONSTRUCTOR
+        //====================
 
+        public AxiModelT90(int nx, int nr, double r0, HexMeshPanelMaterial Material) : base(nx, nr, r0, Material)
+        {
 
+        }
 
-        #endregion
+        public AxiModelT90(PathsIO path) : base(path)
+        {
+
+        }
 
         // CLASS CONSTRUCTS
         #region
-        //public AxiModelT90(MeshParam _meshParam, CodendParam _codendParam, double _towSpeed)
-        //{
-        //    /*main inputs*/
-        //    #region
-        //    l0 = _meshParam.l0;
-        //    m0 = _meshParam.m0;
-        //    kl = _meshParam.kl;
-        //    km = _meshParam.km;
-
-        //    nx = _codendParam.nx;
-        //    nr = _codendParam.nr;
-        //    nc = _codendParam.nc;
-        //    r0 = _codendParam.r0;
-
-        //    P = 0.5 * 1.4 * 1025.0 * Math.Pow(_towSpeed, 2);
-        //    #endregion
 
         //    /* sizes */
-        //    dof = nx * 6 + 3;
-        //    ncp = 2 * nx + 1 - 2 * nc;
+        //    
+        //    
 
-        //    /*angles and trigonometric functions*/
-        //    theta = 2 * pi / nr;
-        //    co = Math.Cos(theta);
-        //    si = Math.Sin(theta);
+
 
         //    /*force vectors and jacobian matrices*/
         //    #region
-        //    X0 = new double[dof];
-        //    x = new double[dof / 3];
-        //    y = new double[dof / 3];
-        //    z = new double[dof / 3];
-        //    r = new double[dof / 3];
-
-        //    FA = new double[dof];
-        //    FB = new double[dof];
-        //    FF = new double[dof];
-        //    FT = new double[dof];
-        //    FC = new double[dof];
 
         //    dFTdX = new double[dof][];
         //    dFCdX = new double[dof][];
@@ -127,65 +94,92 @@ namespace AxiCodend
 
         // CLASS METHODS
 
-        /* for updating*/
+        /* for updating/initializing*/
 
-        public void ChangeCatch(int newnc)
+        protected override void SetDOF()
         {
-            nc = newnc;
-            ncp = 2 * nx + 1 - 2 * nc;
+            dof = nx * 6 + 3;           // dof number  
+        }
 
-            Array.Clear(FC, 0, FC.Length);
+        protected override void SetBlockedMeshes()
+        {
+            ncp = 2 * nx + 1 - 2 * nc;  // nodes affected by catch
+        }
 
-            for (int i = 0; i < dof; i++)
+        protected override void SetAngles()
+        {
+            /*angles and trigonometric functions*/
+            theta = 2 * pi / nr;
+            co = Math.Cos(theta);
+            si = Math.Sin(theta);
+        }
+
+        public override void ClearState()
+        {
+            X = new double[dof];
+
+            x = new double[dof / 3]; // helper cartesian coordinates
+            y = new double[dof / 3];
+            z = new double[dof / 3];
+            r = new double[dof / 3];
+
+            F = new double[dof];
+            R = 0;
+            Jcs = new CoordinateStorage<double>(dof, dof, 6 * 6 + (dof - 6) * 9);
+        }
+
+        public override void UpdatePosition(double[] h, double lambda)
+        {
+            for (int i = nbc_beg; i < dof - nbc_end; i++)
             {
-                Array.Clear(dFCdX[i], 0, dFCdX[i].Length);
+                X[i] = X[i] - lambda * h[i];
             }
         }
 
-        public void ChangeKnotLength(double newl0)
+        public override void ApplyCatch(int newCatch)
         {
-            l0 = newl0;
+            nc = newCatch;
+            ncp = 2 * nx + 1 - 2 * nc;  // nodes affected by catch
         }
 
-        public void ChangeSpeed(double newu)
+        public override void ApplyTowing(double newSpeed)
         {
-            P = 0.5 * 1.4 * 1025.0 * Math.Pow(newu, 2);
+            towSpeed = newSpeed;
+            P = 0.5 * catchCd * rhoWater * Math.Pow(towSpeed, 2);
         }
 
         /* initial shape*/
 
-        public double[] GetInitialShape()
+        public override void SetInitialShape()
         {
-            X0[1] = l0 / 2;                                             // y1
-            X0[2] = Math.Sqrt(Math.Pow(r0, 2) - Math.Pow((l0 / 2), 2)); // z1
+            X[1] = l0 / 2;                                             // y1
+            X[2] = Math.Sqrt(Math.Pow(r0, 2) - Math.Pow((l0 / 2), 2)); // z1
 
             /*x for all nodes*/
             for (int i = 0; i < dof / 3; i++)
             {
-                X0[3 * i] = i * (l0 + m0) / 2;
+                X[3 * i] = i * (l0 + m0) / 2;
             }
 
             /*even nodes y and z*/
             for (int i = 1; i <= nx; i++)
             {
-                X0[6 * i - 2] = r0 * Math.Sin(2 * pi / 180);          // y
-                X0[6 * i - 1] = r0 * Math.Cos(2 * pi / 180);          // z
+                X[6 * i - 2] = r0 * Math.Sin(2 * pi / 180);          // y
+                X[6 * i - 1] = r0 * Math.Cos(2 * pi / 180);          // z
             }
 
             /*odd nodes y and z*/
             for (int i = 1; i <= (nx - 1); i++)
             {
-                X0[6 * i + 1] = r0 * Math.Sin(2 * pi / 360);      // y
-                X0[6 * i + 2] = r0 * Math.Cos(2 * pi / 360);      // z
+                X[6 * i + 1] = r0 * Math.Sin(2 * pi / 360);      // y
+                X[6 * i + 2] = r0 * Math.Cos(2 * pi / 360);      // z
             }
-
-            return X0;
         }
 
-        public double[] GetInitialShapeSmooth()
+        public override void SetInitialShapeSmooth()
         {
-            X0[1] = l0 / 2;                                             // y1
-            X0[2] = Math.Sqrt(Math.Pow(r0, 2) - Math.Pow((l0 / 2), 2)); // z1
+            X[1] = l0 / 2;                                             // y1
+            X[2] = Math.Sqrt(Math.Pow(r0, 2) - Math.Pow((l0 / 2), 2)); // z1
 
             double fStretch = 1.01;
             double L = 0.5 * pi * r0 / (fStretch * m0);
@@ -193,12 +187,12 @@ namespace AxiCodend
             /*x for all nodes*/
             for (int i = 0; i < dof / 3; i++)
             {
-                X0[3 * i] = i * fStretch * m0;
+                X[3 * i] = i * fStretch * m0;
 
                 if (i > dof/3 - L)
                 {
                     omega += fStretch * m0 / r0;
-                    X0[3 * i] = X0[3 * i - 3] + fStretch * m0 * Math.Cos(omega);
+                    X[3 * i] = X[3 * i - 3] + fStretch * m0 * Math.Cos(omega);
                 }
             }
 
@@ -207,51 +201,49 @@ namespace AxiCodend
             for (int i = 1; i <= nx; i++)
             {
             /*even nodes y and z*/
-                X0[6 * i - 2] = r0 * Math.Sin(2 * pi / (3 * nr));      // y
-                X0[6 * i - 1] = r0 * Math.Cos(2 * pi / (3 * nr));      // z
+                X[6 * i - 2] = r0 * Math.Sin(2 * pi / (3 * nr));      // y
+                X[6 * i - 1] = r0 * Math.Cos(2 * pi / (3 * nr));      // z
 
             /*odd nodes y and z*/
-                X0[6 * i + 1] = r0 * Math.Sin(2 * pi / (6 * nr));      // y
-                X0[6 * i + 2] = r0 * Math.Cos(2 * pi / (6 * nr));      // z
+                X[6 * i + 1] = r0 * Math.Sin(2 * pi / (6 * nr));      // y
+                X[6 * i + 2] = r0 * Math.Cos(2 * pi / (6 * nr));      // z
 
                 if(i > nx - L / 2 + 1)
                 {
                     /*even nodes y and z*/
                     omega += fStretch * m0 / r0;
-                    X0[6 * i - 2] = r0 * Math.Sin(2 * pi / (3 * nr)) * Math.Cos(omega);      // y
-                    X0[6 * i - 1] = r0 * Math.Cos(2 * pi / (3 * nr)) * Math.Cos(omega);      // z
+                    X[6 * i - 2] = r0 * Math.Sin(2 * pi / (3 * nr)) * Math.Cos(omega);      // y
+                    X[6 * i - 1] = r0 * Math.Cos(2 * pi / (3 * nr)) * Math.Cos(omega);      // z
 
                     /*odd nodes y and z*/
                     omega += fStretch * m0 / r0;
-                    X0[6 * i + 1] = r0 * Math.Sin(2 * pi / (6 * nr)) * Math.Cos(omega);      // y
-                    X0[6 * i + 2] = r0 * Math.Cos(2 * pi / (6 * nr)) * Math.Cos(omega);      // z
+                    X[6 * i + 1] = r0 * Math.Sin(2 * pi / (6 * nr)) * Math.Cos(omega);      // y
+                    X[6 * i + 2] = r0 * Math.Cos(2 * pi / (6 * nr)) * Math.Cos(omega);      // z
                 }
             }
-            X0[dof - 1] = 0;
-            X0[dof - 2] = 0;
+            X[dof - 1] = 0;
+            X[dof - 2] = 0;
 
             //for (int i = 0; i < dof / 3; i++)
             //{
             //    Console.WriteLine(String.Format("{0,15:N4} {1,15:N4} {2,15:N4} {3,15:N4}",
             //                                    i + 1, X0[3 * i], X0[3 * i + 1], X0[3 * i + 2]));
             //}
-            return X0;
         }
 
-        public double[] GetInitialShape(string path)
+        public override void SetInitialShape(string path)
         {
             string[] lines = File.ReadAllLines(path);
 
             for (int i = 0; i < lines.Length; i++)
             {
-                X0[i] = Convert.ToDouble(lines[i]);
+                X[i] = Convert.ToDouble(lines[i]);
             }
-            return X0;
         }
 
         /* forces*/
 
-        public double[] GetTwineForces(double[] X)
+        private void SetTwineForces(bool IncludeBC)
         {
             for (int i = 0; i < dof / 3; i++)
             {
@@ -269,11 +261,11 @@ namespace AxiCodend
 
                 if (l < l0)
                 {
-                    FA[6 * i + 1] = 0;                                  // Fy
+                    F[6 * i + 1] += 0;                                  // Fy
                 }
                 else
                 {
-                    FA[6 * i + 1] = -(kl / l0) * (Math.Abs(l) - l0);    // Fy
+                    F[6 * i + 1] += -(kl / l0) * (Math.Abs(l) - l0);    // Fy
                 }
             }
 
@@ -285,13 +277,13 @@ namespace AxiCodend
 
                 if (l < l0)
                 {
-                    FA[6 * i - 2] = 0;    // Fy
-                    FA[6 * i - 1] = 0;    // Fz
+                    F[6 * i - 2] += 0;    // Fy
+                    F[6 * i - 1] += 0;    // Fz
                 }
                 else
                 {
-                    FA[6 * i - 2] = (kl / l0) * (l - l0) * (si * z[2 * i - 1] - co * y[2 * i - 1] - y[2 * i - 1]) / l;      // Fy
-                    FA[6 * i - 1] = (kl / l0) * (l - l0) * (co * z[2 * i - 1] + si * y[2 * i - 1] - z[2 * i - 1]) / l;      // Fz
+                    F[6 * i - 2] += (kl / l0) * (l - l0) * (si * z[2 * i - 1] - co * y[2 * i - 1] - y[2 * i - 1]) / l;      // Fy
+                    F[6 * i - 1] += (kl / l0) * (l - l0) * (co * z[2 * i - 1] + si * y[2 * i - 1] - z[2 * i - 1]) / l;      // Fz
                 }
 
             }
@@ -307,15 +299,15 @@ namespace AxiCodend
                               Math.Pow((z[2 * i - 2] - z[2 * i - 1]), 2));
                 if (m < m0)
                 {
-                    FB[6 * i - 3] = 0;              // Fx
-                    FB[6 * i - 2] = 0;              // Fy
-                    FB[6 * i - 1] = 0;              // Fz
+                    F[6 * i - 3] += 0;              // Fx
+                    F[6 * i - 2] += 0;              // Fy
+                    F[6 * i - 1] += 0;              // Fz
                 }
                 else
                 {
-                    FB[6 * i - 3] = (km / m0) * (m - m0) * (x[2 * i - 2] - x[2 * i - 1]) / m;   // Fx
-                    FB[6 * i - 2] = (km / m0) * (m - m0) * (y[2 * i - 2] - y[2 * i - 1]) / m;   // Fy
-                    FB[6 * i - 1] = (km / m0) * (m - m0) * (z[2 * i - 2] - z[2 * i - 1]) / m;   // Fz
+                    F[6 * i - 3] += (km / m0) * (m - m0) * (x[2 * i - 2] - x[2 * i - 1]) / m;   // Fx
+                    F[6 * i - 2] += (km / m0) * (m - m0) * (y[2 * i - 2] - y[2 * i - 1]) / m;   // Fy
+                    F[6 * i - 1] += (km / m0) * (m - m0) * (z[2 * i - 2] - z[2 * i - 1]) / m;   // Fz
                 }
             }
 
@@ -327,15 +319,15 @@ namespace AxiCodend
                               Math.Pow((z[2 * i - 1] - z[2 * i]), 2));
                 if (m < m0)
                 {
-                    FB[6 * i + 0] = 0;  // Fx
-                    FB[6 * i + 1] = 0;  // Fy
-                    FB[6 * i + 2] = 0;  // Fz
+                    F[6 * i + 0] += 0;  // Fx
+                    F[6 * i + 1] += 0;  // Fy
+                    F[6 * i + 2] += 0;  // Fz
                 }
                 else
                 {
-                    FB[6 * i + 0] = (km / m0) * (m - m0) * (x[2 * i - 1] - x[2 * i]) / m;   // Fx
-                    FB[6 * i + 1] = (km / m0) * (m - m0) * (y[2 * i - 1] - y[2 * i]) / m;   // Fy
-                    FB[6 * i + 2] = (km / m0) * (m - m0) * (z[2 * i - 1] - z[2 * i]) / m;   // Fz
+                    F[6 * i + 0] += (km / m0) * (m - m0) * (x[2 * i - 1] - x[2 * i]) / m;   // Fx
+                    F[6 * i + 1] += (km / m0) * (m - m0) * (y[2 * i - 1] - y[2 * i]) / m;   // Fy
+                    F[6 * i + 2] += (km / m0) * (m - m0) * (z[2 * i - 1] - z[2 * i]) / m;   // Fz
                 }
             }
             #endregion
@@ -350,15 +342,15 @@ namespace AxiCodend
                               Math.Pow((z[2 * i] - z[2 * i - 1]), 2));
                 if (m < m0)
                 {
-                    FF[6 * i - 3] = 0;  // Fx
-                    FF[6 * i - 2] = 0;  // Fy
-                    FF[6 * i - 1] = 0;  // Fz
+                    F[6 * i - 3] += 0;  // Fx
+                    F[6 * i - 2] += 0;  // Fy
+                    F[6 * i - 1] += 0;  // Fz
                 }
                 else
                 {
-                    FF[6 * i - 3] = (km / m0) * (m - m0) * (x[2 * i] - x[2 * i - 1]) / m;  // Fx
-                    FF[6 * i - 2] = (km / m0) * (m - m0) * (y[2 * i] - y[2 * i - 1]) / m;  // Fy
-                    FF[6 * i - 1] = (km / m0) * (m - m0) * (z[2 * i] - z[2 * i - 1]) / m;  // Fz
+                    F[6 * i - 3] += (km / m0) * (m - m0) * (x[2 * i] - x[2 * i - 1]) / m;  // Fx
+                    F[6 * i - 2] += (km / m0) * (m - m0) * (y[2 * i] - y[2 * i - 1]) / m;  // Fy
+                    F[6 * i - 1] += (km / m0) * (m - m0) * (z[2 * i] - z[2 * i - 1]) / m;  // Fz
                 }
             }
 
@@ -370,29 +362,27 @@ namespace AxiCodend
                               Math.Pow(z[2 * i + 1] - z[2 * i], 2));
                 if (m < m0)
                 {
-                    FF[6 * i + 0] = 0;  // Fx
-                    FF[6 * i + 1] = 0;  // Fy
-                    FF[6 * i + 2] = 0;  // Fz
+                    F[6 * i + 0] += 0;  // Fx
+                    F[6 * i + 1] += 0;  // Fy
+                    F[6 * i + 2] += 0;  // Fz
                 }
                 else
                 {
-                    FF[6 * i + 0] = (km / m0) * (m - m0) * (x[2 * i + 1] - x[2 * i]) / m;  // Fx
-                    FF[6 * i + 1] = (km / m0) * (m - m0) * (y[2 * i + 1] - y[2 * i]) / m;  // Fy
-                    FF[6 * i + 2] = (km / m0) * (m - m0) * (z[2 * i + 1] - z[2 * i]) / m;  // Fz
+                    F[6 * i + 0] += (km / m0) * (m - m0) * (x[2 * i + 1] - x[2 * i]) / m;  // Fx
+                    F[6 * i + 1] += (km / m0) * (m - m0) * (y[2 * i + 1] - y[2 * i]) / m;  // Fy
+                    F[6 * i + 2] += (km / m0) * (m - m0) * (z[2 * i + 1] - z[2 * i]) / m;  // Fz
                 }
             }
             #endregion
 
-            FT = FA.Add(FF.Add(FB));    // FT = FA + FF + FB collect all contributions at each node
-
-            return FT;
+            if (IncludeBC)
+            {
+                F[0] = F[1] = F[2] = F[dof - 1] = F[dof - 2] = 0;
+            }
         }
 
-        public double[] GetCatchForces(double[] X)
+        private void SetCatchForces(bool IncludeBC)
         {
-            Array.Clear(FF, 0, FF.Length);
-            Array.Clear(FB, 0, FB.Length);
-
             for (int i = 0; i < dof / 3; i++)
             {
                 x[i] = X[3 * i];
@@ -407,15 +397,15 @@ namespace AxiCodend
             {                            
                 if (i == 2 * nx + 1)   // very last point
                 {
-                    FB[3 * i - 3] = pi * 0.25 * P / nr * (Math.Pow((r[i - 2]), 2) - Math.Pow((r[i - 1]), 2));
-                    FB[3 * i - 2] = pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * (x[i - 1] - x[i - 2]) / Math.Pow(2, 0.5);
-                    FB[3 * i - 1] = pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * (x[i - 1] - x[i - 2]) / Math.Pow(2, 0.5);
+                    F[3 * i - 3] += pi * 0.25 * P / nr * (Math.Pow((r[i - 2]), 2) - Math.Pow((r[i - 1]), 2));
+                    F[3 * i - 2] += pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * (x[i - 1] - x[i - 2]) / Math.Pow(2, 0.5);
+                    F[3 * i - 1] += pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * (x[i - 1] - x[i - 2]) / Math.Pow(2, 0.5);
                 }
                 else                     // pressure backward starting from npp+1
                 {
-                FB[3 * i - 3] = pi * 0.25 * P / nr * (Math.Pow((r[i - 2]), 2) - Math.Pow((r[i - 1]), 2));
-                FB[3 * i - 2] = pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * y[i - 1] / r[i - 1] * (x[i - 1] - x[i - 2]);
-                FB[3 * i - 1] = pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * z[i - 1] / r[i - 1] * (x[i - 1] - x[i - 2]);
+                F[3 * i - 3] += pi * 0.25 * P / nr * (Math.Pow((r[i - 2]), 2) - Math.Pow((r[i - 1]), 2));
+                F[3 * i - 2] += pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * y[i - 1] / r[i - 1] * (x[i - 1] - x[i - 2]);
+                F[3 * i - 1] += pi * 0.25 * P / nr * (r[i - 2] + r[i - 1]) * z[i - 1] / r[i - 1] * (x[i - 1] - x[i - 2]);
                 }
             }
             #endregion
@@ -424,37 +414,33 @@ namespace AxiCodend
             #region
             for (int i = ncp; i <= 2 * nx; i++)
             {
-                FF[3 * i - 3] = pi * 0.25 * P / nr * (Math.Pow((r[i - 1]), 2) - Math.Pow((r[i]), 2));
-                FF[3 * i - 2] = pi * 0.25 * P / nr * (r[i - 1] + r[i]) * y[i - 1] / r[i - 1] * (x[i] - x[i - 1]);
-                FF[3 * i - 1] = pi * 0.25 * P / nr * (r[i - 1] + r[i]) * z[i - 1] / r[i - 1] * (x[i] - x[i - 1]);
+                F[3 * i - 3] += pi * 0.25 * P / nr * (Math.Pow((r[i - 1]), 2) - Math.Pow((r[i]), 2));
+                F[3 * i - 2] += pi * 0.25 * P / nr * (r[i - 1] + r[i]) * y[i - 1] / r[i - 1] * (x[i] - x[i - 1]);
+                F[3 * i - 1] += pi * 0.25 * P / nr * (r[i - 1] + r[i]) * z[i - 1] / r[i - 1] * (x[i] - x[i - 1]);
             }
             #endregion
 
-            FC = FF.Add(FB); // FC = FF + FB collect all contributions at each node
-
-            return FC;
+            if (IncludeBC)
+            {
+                F[0] = F[1] = F[2] = F[dof - 1] = F[dof - 2] = 0;
+            }
         }
 
-        public double[] GetTotalForces(double[] X)
+        public override void UpdateTotalForces(bool IncludeBC)
         {
-            FT = GetTwineForces(X);
-            FC = GetCatchForces(X);
-         
-            F = FT.Add(FC);             /*Add elastic twine forces and catch presure forces*/
-
-            return F;
+            Array.Clear(F, 0, F.Length);
+            SetTwineForces(IncludeBC);
+            SetCatchForces(IncludeBC);
         }
 
-        public double ForceResidue(double[] F)
+        public override void UpdateResidual()
         {
             R = 0;
-
             for (int i = nbc_beg; i < dof - nbc_end; i++)
             {
                 R += Math.Pow(F[i], 2);                      // residue as sum of squares
             }
             R = Math.Sqrt(R);
-            return R;
         }
 
         /* jacobian and stiffness*/
@@ -906,39 +892,6 @@ namespace AxiCodend
             return dFdX;
         }
 
-        /*check numaerical jacobian*/
-
-        public void CheckJacobian(double[][] J, double[] X)
-        {
-            double h = Math.Pow(10, -9);
-            double[] Xpert = new double[X.GetLength(0)];
-            double[] F, Fpert;
-            double[][] numJ = new double[X.GetLength(0)][];
-            for (int i = 0; i < X.GetLength(0); i++)
-            {
-                numJ[i] = new double[X.GetLength(0)];
-            }
-            List<string> Mismatch = new List<string>();
-            for (int i = 0; i < X.GetLength(0); i++)
-            {
-                X.CopyTo(Xpert);
-                Xpert[i] += h;
-
-                F = GetTotalForces(X);
-                Fpert = GetTotalForces(Xpert);
-
-                for (int j = 0; j < X.GetLength(0); j++)
-                {
-                    numJ[j][i] = (Fpert[j] - F[j]) / h - J[j][i];
-
-                    if (numJ[j][i] > Math.Pow(10, -2))
-                    {
-                        Mismatch.Add(string.Format("{0};{1}", i, j));
-                    }
-                }
-            }
-        }
-
             /* printing*/
 
         public void Print(double[] Array)
@@ -989,8 +942,8 @@ namespace AxiCodend
             /* Get beginnig reaction and drag force on the catch*/
             #region
 
-            F = GetTotalForces(X);
-            double begR = 2 * nr * F[0];                                   // resultant entrance reaction
+            UpdateTotalForces(IncludeBC: false);
+            double begR = 2 * nr * F[0];                               // resultant entrance reaction
             double dragR = pi * Math.Pow(rCatch, 2) * P;               // resultant catch drag
 
             #endregion

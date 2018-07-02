@@ -39,8 +39,9 @@ namespace AxiCodend
         public CompressedColumnStorage<double> J;
 
         /*others*/
-        private const double rhoWater = 1025;
-        private const double catchCd = 1.4;
+        protected const double rhoWater = 1025;
+        protected const double catchCd = 1.4;
+
         //====================
         // CLASS CONSTRUCTOR
         //====================
@@ -65,13 +66,21 @@ namespace AxiCodend
             kl = Material.KnotEA;
             km = Material.TwineEA;
 
-            InitP();
+            SetPressure();
+            SetDOF();
+            SetBlockedMeshes();
+            ClearState();
+            SetAngles();
         }
 
         public AxiCodend(PathsIO path)
         {
             LoadInput(path);
-            InitP();
+            SetPressure();
+            SetDOF();
+            SetBlockedMeshes();
+            ClearState();
+            SetAngles();
         }
 
         //====================
@@ -82,21 +91,92 @@ namespace AxiCodend
 
         private void LoadInput(PathsIO path)
         {
+            string[] names = { "MeshSide", "KnotSize", "TwineEA", "KnotEA",
+                               "MeshesAlong", "MeshesAround", "EntranceRadius" };
+            string[] lines = File.ReadAllLines(path.input);
+            string[] parts;
+            int currentLine = 0;
+            int foundCount = 0;
 
+            Material = new HexMeshPanelMaterial(path);
+
+            foreach (var line in lines)
+            {
+                if (line.Contains(names[0]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    m0 = Convert.ToDouble(parts[1]) / 2;
+                    foundCount++;
+                }
+
+                if (line.Contains(names[1]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    l0 = Convert.ToDouble(parts[1]);
+                    foundCount++;
+                }
+
+                if (line.Contains(names[2]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    km = Convert.ToDouble(parts[1]);
+                    foundCount++;
+                }
+
+                if (line.Contains(names[3]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    kl = Convert.ToDouble(parts[1]);
+                    foundCount++;
+                }
+
+                if (line.Contains(names[4]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    nx = Convert.ToInt32(parts[1]);
+                    foundCount++;
+                }
+
+                if (line.Contains(names[5]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    nr = Convert.ToInt32(parts[1]);
+                    foundCount++;
+                }
+
+                if (line.Contains(names[6]))
+                {
+                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+                    r0 = Convert.ToDouble(parts[1]);
+                    foundCount++;
+                }
+                currentLine++;
+            }
+
+            if (foundCount != 7)
+            {
+                throw new ArgumentException("Not all fields could be initialized, " +
+                                            "because the input file is not in the right format");
+            }
         }
 
-        private void InitP()
+        private void SetPressure()
         {
             towSpeed = 1;
             P = 0.5 * catchCd * rhoWater * Math.Pow(towSpeed, 2);
         }
 
-        protected virtual void InitDOF()
+        protected virtual void SetDOF()
         {
 
         }
 
-        protected virtual void InitBlockedMeshes()
+        protected virtual void SetBlockedMeshes()
+        {
+
+        }
+
+        protected virtual void SetAngles()
         {
 
         }
