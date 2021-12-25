@@ -18,11 +18,12 @@ dotnet build
 ```
 
 # Main refractoring ideas
+- MeshOrientation is an enum
 - inputs are JSON
 - Standart solver settings are JSON
 - outputs are JSON
 
-```
+```C#
 var cod = new Codend()
     .type()
     .material()
@@ -34,6 +35,41 @@ var sim = new Simulation()
     .with_catch()
     .build()
 ```
+
+```sh
+# simulate towing x catch matrix
+axi_codend job.json
+axi_codend job.json -s solver_settings.json
+```
+
+```C#
+// parse job.json args
+
+// build codend (builder is independent on parser)
+var codend = CodendBuilder().FromJson(filename).build()
+// or
+var codend = CodendBuilder()
+    .withMeshesAlong(l)
+    .withMeshesAcross(nr)
+    .withRadius(r)
+    .WithMaterial(material).build()
+
+var sim = SimulationBuilder()
+    .withTowing(towing)
+    .withCatch(catch)
+    .withSettings(solverSettings)
+
+sim.simulate()
+
+sim.save_json(path)
+```
+# Redundant fucntions
+
+UpdatePosition()
+ApplyTowing()
+UpdateTotalForces()
+UpdateResidual()
+UpdateTotalJacobian()
 
 # AxiCodend
 Simulation of trawl cod-end shapes during the towing using an object-oriented C# version of axis-symmetric numerical model developed by D.Priour (see atached paper and thesis). Input happens throught the "input.txt" file, and should follow the format:
