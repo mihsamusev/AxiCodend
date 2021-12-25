@@ -1,0 +1,27 @@
+{
+    "Paths": {
+        "OutputShapes": "C:\Users\Natalia\Documents\ms_code\axi_codend\demoshapes.txt",
+        "OutputResults": "C:\Users\Natalia\Documents\ms_code\axi_codend\demoresults.txt"
+    },              
+    "Material": {
+        "MeshSide": 0.120000,            
+        "KnotSize": 0.012000,            
+        "TwineEA": 1000.000000,         
+        "KnotEA": 1000.000000,         
+        "MeshOrientation": 90  
+    },
+    "Codend": {
+        "MeshesAlong": 100,                 
+        "MeshesAround": 100,                 
+        "EntranceRadius": 0.400000           
+    },
+    "Catch": {
+        "Blocked": [50, 75]
+    },
+    "Towing": {
+        "TowingSpeed": 1.500000          
+    },
+    "Solver": {
+        "UsePreviousAsPrecalc": false         
+    }         
+}

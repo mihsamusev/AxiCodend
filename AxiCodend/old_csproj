@@ -8,6 +8,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>AxiCodend</RootNamespace>
     <AssemblyName>AxiCodend</AssemblyName>
+    <TargetFrameworkVersion>net6.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NuGetPackageImportStamp>

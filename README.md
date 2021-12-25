@@ -1,3 +1,40 @@
+# How to build
+Install the latest .NET Core SDK
+Install Git
+Clone this repo
+`build.sh` in the root of the cloned repo
+
+# How i migrated
+```sh
+mkdir axi_codend
+dotnet new console
+# copy all files and overwrite Program.cs
+
+# add dependencies
+dotnet add package Accord.Math --version 3.8.2-alph # is obsolete, will be refactored later
+dotnet add package CSparse --version 3.6.0
+
+dotnet build
+```
+
+# Main refractoring ideas
+- inputs are JSON
+- Standart solver settings are JSON
+- outputs are JSON
+
+```
+var cod = new Codend()
+    .type()
+    .material()
+    .build()
+
+var sim = new Simulation()
+    .with_codend(cod)
+    .with_towing()
+    .with_catch()
+    .build()
+```
+
 # AxiCodend
 Simulation of trawl cod-end shapes during the towing using an object-oriented C# version of axis-symmetric numerical model developed by D.Priour (see atached paper and thesis). Input happens throught the "input.txt" file, and should follow the format:
 

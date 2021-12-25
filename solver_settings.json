@@ -1,0 +1,13 @@
+{
+    "IterMax": 5000,
+    "ResidualTol": 1e-3,                         
+    "DisplacementTol": 1e-4,                     
+    "ResidualMax": 1e20,             
+    "StiffnessTol": 1.0,        
+    "DiagStiffness": 1.0,         
+    "ReduceStiffnessBy": 0.1,
+    "IncreaseStiffnessBy": 2.0,
+    "MinCatchBlock": 5,
+    "MinTowingSpeed": 0.1,
+    "UsePreviousAsPrecalc": true
+}
