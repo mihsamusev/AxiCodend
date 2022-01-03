@@ -13,17 +13,6 @@ namespace AxiCodend
     {
         static void Main(string[] args)
         {
-            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
-
-            try
-            {
-                Console.WindowWidth = 100;
-                Console.WindowHeight = 50;
-            }
-            catch
-            {
-
-            }
 
             //=========================
             // INPUT
