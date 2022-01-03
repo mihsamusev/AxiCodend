@@ -19,20 +19,17 @@ namespace AxiCodend
         //=========================
 
         public PathsIO()
-        {         
-            LoadDefault();
-            LoadFromInput(input);
+        {    
+            string dir = "/home/msa/Documents/se_path/cs/AxiCodend/AxiCodend/bin/Debug/net6.0/";
+            input = Path.Combine(dir, "input.txt");
+            outputShapes = Path.Combine(dir, "shape.txt");
+            outputResults = Path.Combine(dir, "results.txt");
         }
 
         //=========================
         // methods
         //=========================
 
-        public string AssemblyPath()
-        {
-            string fullPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().GetName().CodeBase);
-            return fullPath.Replace("file:\\", "");
-        }
 
         public void PrintInfo()
         {
@@ -46,32 +43,5 @@ namespace AxiCodend
             Console.WriteLine();
         }
 
-        private void LoadDefault()
-        {
-            input = AssemblyPath() + "\\input.txt";
-            outputShapes = AssemblyPath() + "\\shape.txt";
-            outputResults = AssemblyPath() + "\\results.txt";
-        }
-
-        private void LoadFromInput(string input)
-        {
-            string[] names = {"OutputShapes", "OutputResults" };
-            string[] lines = File.ReadAllLines(input);
-            string[] parts;
-            int currentLine = 0;
-
-            foreach (var line in lines)
-            {
-                parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-
-                if (line.Contains(names[0]))
-                    outputShapes = parts[1];
-
-                if (line.Contains(names[1]))
-                    outputResults = parts[1];
-
-                currentLine++;
-            }
-        }
-}
+    }
 }
