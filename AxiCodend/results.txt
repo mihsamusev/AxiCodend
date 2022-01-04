@@ -1,3 +1,0 @@
-Length              Max radius          Catch thickness     Catch surface       Catch volume        Total reaction      Total force         
-1.16777E+001        1.87580E+000        4.54439E+000        5.37500E+001        4.12971E+001        1.00695E+004        1.00695E+004        
-1.04468E+001        1.93065E+000        7.08172E+000        8.48461E+001        7.14054E+001        1.01936E+004        1.01936E+004        

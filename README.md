@@ -5,8 +5,8 @@ is of importance as it determines mesh opening and consequently
 influences the selectivity of fish from the cod-end. Poor selectivity results in negative environmental impact due to collection of large quantities of juvenile fish that is usually discarded as by-catch. `AxiCodend` is a CLI tool for simulation of trawl cod-end shapes. It is developed as a object-oriented C# version of axis-symmetric numerical model developed by D.Priour [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0029801814003709?via%3Dihub)]. This implementation was implemented as a part of the master thesis: _Implementation and comparison of two numerical models of trawl cod-end_ [[Link](https://projekter.aau.dk/projekter/en/studentthesis/implementation-and-comparison-of-two-numerical-models-for-trawl-codends(7c4900a9-f83e-4f61-818b-2c271252cab1).html)]. 
 
 ## How to build
-- Install [.NET 6.0 Core SDK]()
-- Install [git]()
+- Install [.NET 6.0 Core SDK](https://dotnet.microsoft.com/en-us/download)
+- Install [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
 Using Terminal or PowerShell:
 ```sh
@@ -19,8 +19,9 @@ dotnet build --release
 A simulation job can be run using the `dotnet` command
 
 ```sh
-dotnet run --job example_job.yaml
+dotnet run -p AxiCodend --job example_job.yaml # from the solution folder
 ```
+
 The job configuration file consists of settings regarding the cod-end geometry, materials, loads, simulation output paths and solver settings.
 
 ```yaml
