@@ -16,14 +16,14 @@ Using Terminal or PowerShell:
 ```sh
 git clone https://github.com/mihsamusev/AxiCodend \
 cd AxiCodend \
-dotnet build --release
+dotnet build --configuration Release
 ```
 
 ## Getting started
 A simulation job can be run using the `dotnet` command
 
 ```sh
-dotnet run -p AxiCodend --job example_job.yaml # from the solution folder
+dotnet run --project AxiCodend --job example_job.yaml # from the solution folder
 ```
 
 The job configuration file consists of settings regarding the cod-end geometry, materials, loads, simulation output paths and solver settings.
