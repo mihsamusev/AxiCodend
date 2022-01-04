@@ -14,10 +14,12 @@ namespace AxiCodend
         //============================
 
         public AxiCodend Codend;
-        public Towing Towing;
-        public Catch Catch;
+        public double towing_speed;
+        public int[] catches;
+
+
         public SolverSettings SolverSettings { get; set; }
-        public PathsIO Paths { get; set; }
+        public OutputPaths Paths { get; set; }
         private double[] precalcX;
         private double[] previousX;
 
@@ -25,12 +27,12 @@ namespace AxiCodend
         // CONSTRUCTOR
         //============================
 
-        public Simulation(AxiCodend Codend, Catch Catch, Towing Towing)
+        public Simulation(AxiCodend Codend, int[] catches, double towing_speed)
         {
             this.Codend = Codend;
-            this.Catch = Catch;
-            this.Towing = Towing;
-            Paths = new PathsIO(); // go with default settingst
+            this.catches = catches;
+            this.towing_speed = towing_speed;
+            Paths = new OutputPaths(); // go with default settingst
             SolverSettings = new SolverSettings(); // go with default settingst
             precalcX = new double[Codend.dof];
             previousX = new double[Codend.dof];
@@ -263,13 +265,13 @@ namespace AxiCodend
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            double[][] allX = new double[Catch.Count][];
+            double[][] allX = new double[catches.Length][];
             StartResultsFile();
-            for (int i = 0; i < Catch.Count; i++)
+            for (int i = 0; i < catches.Length; i++)
             {
-                Codend.ApplyTowing(Towing.Speed);
-                Codend.ApplyCatch(Catch.BlockedMeshes[i]);
-                Console.WriteLine("Simulation {0} with {1} blocked meshes\n", i, Catch.BlockedMeshes[i]);
+                Codend.ApplyTowing(towing_speed);
+                Codend.ApplyCatch(catches[i]);
+                Console.WriteLine("Simulation {0} with {1} blocked meshes\n", i, catches[i]);
                 Solve();
                 AppendResults();
 
@@ -283,17 +285,17 @@ namespace AxiCodend
             SaveShapes(allX);
 
             Console.WriteLine("\nSimulation of {0} catches is finished in {1} [ms]\n",
-            Catch.Count, stopwatch.ElapsedMilliseconds);
+            catches.Length, stopwatch.ElapsedMilliseconds);
 
         }
 
         private void SaveShapes(double[][] allX)
         {
-            using (StreamWriter ResultFile = new StreamWriter(Paths.outputShapes))
+            using (StreamWriter ResultFile = new StreamWriter(Paths.OutputShapes))
             {
                 for (int row = 0; row < Codend.dof; row++)
                 {
-                    for (int col = 0; col < Catch.Count; col++)
+                    for (int col = 0; col < catches.Length; col++)
                     {
                         ResultFile.Write("{0,-15:E5}",allX[col][row]);
                     }
@@ -304,7 +306,7 @@ namespace AxiCodend
 
         private void StartResultsFile()
         {
-            using (StreamWriter ResultFile = new StreamWriter(Paths.outputResults))
+            using (StreamWriter ResultFile = new StreamWriter(Paths.OutputResults))
             {
                 ResultFile.WriteLine("{0,-20}{1,-20}{2,-20}{3,-20}{4,-20}{5,-20}{6,-20}",
                                      "Length",
@@ -319,7 +321,7 @@ namespace AxiCodend
 
         private void AppendResults()
         {
-            using (StreamWriter ResultFile = File.AppendText(Paths.outputResults))
+            using (StreamWriter ResultFile = File.AppendText(Paths.OutputResults))
             {
                 ResultFile.WriteLine("{0,-20:E5}{1,-20:E5}{2,-20:E5}{3,-20:E5}{4,-20:E5}{5,-20:E5}{6,-20:E5}",
                      Codend.Length(),

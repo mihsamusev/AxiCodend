@@ -71,11 +71,29 @@ namespace AxiCodend
 
         }
 
-        public AxiModelT0(PathsIO path) : base(path)
-        {          
-            
-        }
+        public AxiModelT0(CodendGeometry geometry, HexMeshPanelMaterial Material)
+        {
+            /*main inputs*/
+            this.nx = geometry.MeshesAlong;
+            this.nr = geometry.MeshesAround;
+            this.r0 = geometry.EntranceRadius;
+            this.Material = Material;
 
+            nc = nx;    // to start with entire codend is blocked
+
+            l0 = Material.KnotSize;
+            m0 = Material.MeshSide / 2;
+            kl = Material.KnotStiffness;
+            km = Material.TwineStiffness;
+
+            towSpeed = 1;
+            P = 0.5 * catchCd * rhoWater * Math.Pow(towSpeed, 2);
+
+            SetDOF();
+            SetBlockedMeshes();
+            ClearState();
+            SetAngles();
+        }
 
         //====================
         // CLASS METHODS

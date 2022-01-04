@@ -63,19 +63,9 @@ namespace AxiCodend
 
             l0 = Material.KnotSize;
             m0 = Material.MeshSide / 2;
-            kl = Material.KnotEA;
-            km = Material.TwineEA;
+            kl = Material.KnotStiffness;
+            km = Material.TwineStiffness;
 
-            SetPressure();
-            SetDOF();
-            SetBlockedMeshes();
-            ClearState();
-            SetAngles();
-        }
-
-        public AxiCodend(PathsIO path)
-        {
-            LoadInput(path);
             SetPressure();
             SetDOF();
             SetBlockedMeshes();
@@ -88,77 +78,6 @@ namespace AxiCodend
         //====================
 
         /*private methods*/
-
-        private void LoadInput(PathsIO path)
-        {
-            string[] names = { "MeshSide", "KnotSize", "TwineEA", "KnotEA",
-                               "MeshesAlong", "MeshesAround", "EntranceRadius" };
-            string[] lines = File.ReadAllLines(path.input);
-            string[] parts;
-            int currentLine = 0;
-            int foundCount = 0;
-
-            Material = new HexMeshPanelMaterial(path);
-
-            foreach (var line in lines)
-            {
-                if (line.Contains(names[0]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    m0 = Convert.ToDouble(parts[1]) / 2;
-                    foundCount++;
-                }
-
-                if (line.Contains(names[1]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    l0 = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[2]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    km = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[3]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    kl = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[4]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    nx = Convert.ToInt32(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[5]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    nr = Convert.ToInt32(parts[1]);
-                    foundCount++;
-                }
-
-                if (line.Contains(names[6]))
-                {
-                    parts = lines[currentLine].Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-                    r0 = Convert.ToDouble(parts[1]);
-                    foundCount++;
-                }
-                currentLine++;
-            }
-
-            if (foundCount != 7)
-            {
-                throw new ArgumentException("Not all fields could be initialized, " +
-                                            "because the input file is not in the right format");
-            }
-        }
 
         private void SetPressure()
         {

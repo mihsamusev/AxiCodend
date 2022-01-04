@@ -1,51 +1,93 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Reflection;
-using CSparse.Storage;
-using CSparse;
-using CSparse.Double.Factorization;
+﻿
+
+using CommandLine;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace AxiCodend
 {
+    struct CodendGeometry {
+        public int MeshesAlong {get; set;} = 100;                 
+        public int MeshesAround {get; set;} = 100;                 
+        public double EntranceRadius {get; set;} = 0.400000;
+
+        public override string ToString()
+        {
+            return "Codend geometry:\n" +  
+                String.Format("{0,-35}{1,-10:D}\n", "Meshes along", MeshesAlong) + 
+                String.Format("{0,-35}{1,-10:D}\n", "Meshes around", MeshesAround) + 
+                String.Format("{0,-35}{1,-10:F2}{2}\n", "Entrance radius", EntranceRadius,"[m]");
+        }
+    }
+
+    public class InputArguments
+    {
+        [Option('j', "job", Required = true, HelpText = "YAML job configuration file")]
+        public string? jobFile {get; set;}
+    }
+
+    struct JobConfig
+    {
+        public OutputPaths paths {get; set;}
+        public HexMeshPanelMaterial material {get; set;}
+        public CodendGeometry geometry {get; set;}
+        public int[] catches {get; set;} = {};
+        public double towing_speed {get; set;} = 0;
+        public SolverSettings solver {get; set;}
+
+        public JobConfig() {
+            paths = new OutputPaths();
+            material = new HexMeshPanelMaterial();
+            geometry = new CodendGeometry();
+            solver = new SolverSettings();
+        }
+    }
+
     class Program
     {
-        static void Main(string[] args)
+        static T ParseYaml<T>(string configPath)
         {
-            var path = new PathsIO();
+        var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .Build();
 
-            if (!File.Exists(path.input))
-            {
-                Console.WriteLine("input.txt does not exis in the assembly path.");
-                return;
-            }
+        return deserializer.Deserialize<T>(
+            File.ReadAllText(configPath));
+        }
 
-            var hexMeshPanel = new HexMeshPanelMaterial(path);
-            hexMeshPanel.PrintInfo();
+        static void Main(string[] args) {
+            var results = Parser.Default.ParseArguments<InputArguments>(args)
+                .WithParsed(args => Run(args));
+        }
 
+
+        static void Run(InputArguments args)
+        {
+            var cfg = ParseYaml<JobConfig>(args.jobFile);
+
+            var hexMeshMaterial = cfg.material;
+            Console.WriteLine(hexMeshMaterial.ToString());
+
+            var solverSettings = cfg.solver;
+            Console.WriteLine(solverSettings.ToString());
+            
+            var codendGeometry = cfg.geometry;
+            Console.WriteLine(codendGeometry.ToString());
+            
             AxiCodend codend = new AxiCodend();
-       
-            if (hexMeshPanel.MeshOrientation == 0)
+            
+            if (hexMeshMaterial.MeshOrientation == MeshOrientation.T0)
             {
-                codend = new AxiModelT0(path);   // initialize T0 model
-            }
-            else if(hexMeshPanel.MeshOrientation == 90)
-            {
-                codend = new AxiModelT90(path);   // initialize T90 model
+                codend = new AxiModelT0(codendGeometry, hexMeshMaterial);   // initialize T0 model
             }
             else
             {
                 throw new IOException("Incorrect mesh orientation. Value should be 0 or 90.");
             }
-            
-            var towing = new Towing(path);
 
-            var catches = new Catch(path);
-
-            var TowingSimulation = new Simulation(codend, catches, towing)
+            var TowingSimulation = new Simulation(codend, cfg.catches, cfg.towing_speed)
             {
-                SolverSettings = new SolverSettings(path),
-                Paths = path
+                SolverSettings = solverSettings,
+                Paths = cfg.paths
             };
 
             TowingSimulation.Simulate();

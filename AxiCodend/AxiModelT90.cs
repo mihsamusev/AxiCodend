@@ -55,11 +55,6 @@ namespace AxiCodend
 
         }
 
-        public AxiModelT90(PathsIO path) : base(path)
-        {
-
-        }
-
         //=====================
         // CLASS METHODS
         //=====================

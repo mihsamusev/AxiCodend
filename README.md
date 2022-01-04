@@ -11,8 +11,9 @@ dotnet new console
 # copy all files and overwrite Program.cs
 
 # add dependencies
-dotnet add package Accord.Math --version 3.8.2-alph # is obsolete, will be refactored later
+dotnet add package Accord.Math --version 3.8.2-alpha # is obsolete, will be refactored later
 dotnet add package CSparse --version 3.6.0
+dotnet add package YamlDotNet --version 11.2.1
 
 dotnet build
 ```

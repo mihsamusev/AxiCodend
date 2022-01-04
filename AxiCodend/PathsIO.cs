@@ -4,7 +4,7 @@ using System.IO;
 
 namespace AxiCodend
 {
-    class PathsIO
+    struct PathsIO
     {
         //=========================
         // fields
@@ -43,5 +43,29 @@ namespace AxiCodend
             Console.WriteLine();
         }
 
+    }
+
+
+    struct OutputPaths
+    {
+        public string OutputShapes {get; set;}
+        public string OutputResults {get; set;}
+
+        public bool Valid() {
+            var isValidShapesDir = Directory.Exists(Path.GetDirectoryName(OutputShapes));
+            var isValidResultsDir = Directory.Exists(Path.GetDirectoryName(OutputResults));
+            return isValidShapesDir && isValidResultsDir;
+        }
+
+        public OutputPaths() {
+            OutputShapes = Path.Combine(Directory.GetCurrentDirectory(), "shapes.txt");
+            OutputResults = Path.Combine(Directory.GetCurrentDirectory(), "results.txt");
+        }
+
+        public override string ToString() {
+            return "\nResult save path:\n" + 
+                String.Format("Simulated shapes are saved to {0}", OutputShapes) + 
+                String.Format("Simulated results are saved to {0}", OutputResults);
+        } 
     }
 }
