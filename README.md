@@ -2,7 +2,11 @@
 A cod-end is the rearmost part of a trawl fishing gear that
 collects the catch during the towing. The shape of cod-ends
 is of importance as it determines mesh opening and consequently
-influences the selectivity of fish from the cod-end. Poor selectivity results in negative environmental impact due to collection of large quantities of juvenile fish that is usually discarded as by-catch. `AxiCodend` is a CLI tool for simulation of trawl cod-end shapes. It is developed as a object-oriented C# version of axis-symmetric numerical model developed by D.Priour [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0029801814003709?via%3Dihub)]. This implementation was implemented as a part of the master thesis: _Implementation and comparison of two numerical models of trawl cod-end_ [[Link](https://projekter.aau.dk/projekter/en/studentthesis/implementation-and-comparison-of-two-numerical-models-for-trawl-codends(7c4900a9-f83e-4f61-818b-2c271252cab1).html)]. 
+influences the selectivity of fish from the cod-end. Poor selectivity results in negative environmental impact due to collection of large quantities of juvenile fish that is usually discarded as by-catch. `AxiCodend` is a CLI tool for simulation of trawl cod-end shapes. It is developed as a object-oriented C# version of axis-symmetric numerical model developed by D.Priour [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0029801814003709?via%3Dihub)]. This implementation was created as a part of the master thesis in collaboration with SINTEF Ocean: _Implementation and comparison of two numerical models of trawl cod-end_ [[Link](https://projekter.aau.dk/projekter/en/studentthesis/implementation-and-comparison-of-two-numerical-models-for-trawl-codends(7c4900a9-f83e-4f61-818b-2c271252cab1).html)].
+
+![](/docs/codend_example.png)
+
+_Note: this visualization is not included_.
 
 ## How to build
 - Install [.NET 6.0 Core SDK](https://dotnet.microsoft.com/en-us/download)
