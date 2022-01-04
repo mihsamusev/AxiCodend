@@ -73,6 +73,7 @@ namespace AxiCodend
             var codendGeometry = cfg.geometry;
             Console.WriteLine(codendGeometry.ToString());
             
+            // create a builder
             AxiCodend codend = new AxiCodend();
             
             if (hexMeshMaterial.MeshOrientation == MeshOrientation.T0)

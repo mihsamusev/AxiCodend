@@ -1,126 +1,91 @@
-# How to build
-Install the latest .NET Core SDK
-Install Git
-Clone this repo
-`build.sh` in the root of the cloned repo
-
-# How i migrated
-```sh
-mkdir axi_codend
-dotnet new console
-# copy all files and overwrite Program.cs
-
-# add dependencies
-dotnet add package Accord.Math --version 3.8.2-alpha # is obsolete, will be refactored later
-dotnet add package CSparse --version 3.6.0
-dotnet add package YamlDotNet --version 11.2.1
-
-dotnet build
-```
-
-# Main refractoring ideas
-- MeshOrientation is an enum
-- inputs are JSON
-- Standart solver settings are JSON
-- outputs are JSON
-
-```C#
-var cod = new Codend()
-    .type()
-    .material()
-    .build()
-
-var sim = new Simulation()
-    .with_codend(cod)
-    .with_towing()
-    .with_catch()
-    .build()
-```
-
-```sh
-# simulate towing x catch matrix
-axi_codend job.json
-axi_codend job.json -s solver_settings.json
-```
-
-```C#
-// parse job.json args
-
-// build codend (builder is independent on parser)
-var codend = CodendBuilder().FromJson(filename).build()
-// or
-var codend = CodendBuilder()
-    .withMeshesAlong(l)
-    .withMeshesAcross(nr)
-    .withRadius(r)
-    .WithMaterial(material).build()
-
-var sim = SimulationBuilder()
-    .withTowing(towing)
-    .withCatch(catch)
-    .withSettings(solverSettings)
-
-sim.simulate()
-
-sim.save_json(path)
-```
-# Redundant fucntions
-
-UpdatePosition()
-ApplyTowing()
-UpdateTotalForces()
-UpdateResidual()
-UpdateTotalJacobian()
-
 # AxiCodend
-Simulation of trawl cod-end shapes during the towing using an object-oriented C# version of axis-symmetric numerical model developed by D.Priour (see atached paper and thesis). Input happens throught the "input.txt" file, and should follow the format:
+A cod-end is the rearmost part of a trawl fishing gear that
+collects the catch during the towing. The shape of cod-ends
+is of importance as it determines mesh opening and consequently
+influences the selectivity of fish from the cod-end. Poor selectivity results in negative environmental impact due to collection of large quantities of juvenile fish that is usually discarded as by-catch. `AxiCodend` is a CLI tool for simulation of trawl cod-end shapes. It is developed as a object-oriented C# version of axis-symmetric numerical model developed by D.Priour [[Paper](https://www.sciencedirect.com/science/article/abs/pii/S0029801814003709?via%3Dihub)]. This implementation was implemented as a part of the master thesis: _Implementation and comparison of two numerical models of trawl cod-end_ [[Link](https://projekter.aau.dk/projekter/en/studentthesis/implementation-and-comparison-of-two-numerical-models-for-trawl-codends(7c4900a9-f83e-4f61-818b-2c271252cab1).html)]. 
 
-*Block of paths (essential input) contains the paths where the results are stored, the input is by default input.txt and has to be in the same directory as .exe file*
+## How to build
+- Install [.NET 6.0 Core SDK]()
+- Install [git]()
+
+Using Terminal or PowerShell:
+```sh
+git clone https://github.com/mihsamusev/AxiCodend \
+cd AxiCodend \
+dotnet build --release
 ```
-Paths
-OutputShapes  C:\Users\MyFavouriteFolder\filewithshapes.txt
-OutputResults C:\Users\MyFavouriteFolder\filewithresults.txt
+
+## Getting started
+A simulation job can be run using the `dotnet` command
+
+```sh
+dotnet run --job example_job.yaml
 ```
-*Block of materials (essential input)*
+The job configuration file consists of settings regarding the cod-end geometry, materials, loads, simulation output paths and solver settings.
+
+```yaml
+paths: 
+  output_shapes: demoshapes.txt
+  output_results: demoresults.txt        
+
+material: 
+  mesh_side: 0.120000           # twine length in [m]
+  mesh_orientation: 0           # T0 or T90 (see paper)
+  knot_size: 0.012000           # thickness of the knot [m]
+  twine_stiffness: 1000.000000  # axial stiffness EA in [Nm2]
+  knot_stiffness: 1000.000000   # axial stiffness EA in [Nm2]
+
+geometry: 
+  meshes_along: 100                 
+  meshes_around: 100                 
+  entrance_radius: 0.400000 # [m]
+
+catches: [50, 75]           # in number of blocked meshes from the end
+towing_speed: 1.500000      # speed [m/s]
+
+solver:
+  iter_max: 3000
+  residual_tol: 1e-3         # when to finishe the iteration based on norm force < 0.001 N
+  displacement_tol: 1e-4     # when to finishe the iteration based on norm dispacement < 0.1 mm
+  residual_max: 10e20        # Maximum residual after which the scheme is considered divergent
+  stiffness_tol: 1           #
+  diag_stiffness: 1          # additional stiffness for stable iterations
+
+  reduce_stiffness_by: 0.1   # if system diverged due to being too stiff what to do on restart calculation
+  increase_stiffness_by: 2   # if sysyem diverged due to being too soft 
+
+  show_line_search_steps: false # show intermedite (line search) Newton method solver steps
+  line_search_max: 6            # maximum amount of inexact line search iterations
+  alpha_max: 0.032              # alpha for Armijo step limit globalization method (20% of twine length)
+
+  min_catch_block: 5            
+  min_towing_speed: 0.1            
+  use_previous_as_precalc: false # warm start for the series of simulations
 ```
-Material       
-MeshSide            0.120000            
-KnotSize            0.012000            
-TwineEA             1000.000000         
-KnotEA              1000.000000         
-MeshOrientation     90                  
+*Note: Based on our testing the given solver parameters are sufficient for 99% of the cases. However if in need of more fine grained control the simulation algorithm and solver parameters are described in the thesis.*
+
+### Typical results
+If the simulation is successful the results are saved in 2 `.txt` files. The `results.txt` containts global simulation results such as total drag force, achived length and max cod-end radius. 
 ```
-*Block of cod-end structure (essential input)*
+Length              Max radius          Catch thickness     Catch surface       Catch volume        Total reaction      Total force         
+1.16777E+001        1.87580E+000        4.54439E+000        5.37500E+001        4.12971E+001        1.00695E+004        1.00695E+004        
+1.04468E+001        1.93065E+000        7.08172E+000        8.48461E+001        7.14054E+001        1.01936E+004        1.01936E+004   
 ```
-Codend         
-MeshesAlong         100                 
-MeshesAround        100                 
-EntranceRadius      0.400000            
+
+The `shapes.txt` contains a series of coordinates serialized as pairs of axial and radial coordinates of the cod-end meridian (one line of twines). Multiple runs are appended to the same result files and each column corresponds to one simulation from `results.txt`. Since the structure us axis-symmetric this is sufficient to recover the final deformed sape of the cod-end. In `shapes.txt`. As a sanity check notice that the 2nd coordinate (radial coordinate of the first node) in both columns equals to the entrance radius. The second to last coordinate (axial coordinate of the last node) equals to the result cod-end length.
+
 ```
-*Block of catches (essential input), represents how many meshes along are blocked by catch. Make sure that Count matches the amount of elements in the following catches column.*
+0.00000E+000   0.00000E+000   
+4.00000E-001   4.00000E-001   
+1.30940E-002   1.31977E-002   
+3.98180E-001   4.00862E-001   
+...
+1.16777E+001   1.04468E+001   
+0.00000E+000   0.00000E+000
 ```
-Catch          
-Count               2                  
-50
-75
-```
-Block of Towing (essential input)
-```
-Towing         
-TowingSpeed         1.500000            
-```
-*Block of Solver settings (optional), if nothing is input the solver uses following default settings*
-```
-Solver         
-IterMax         5000
-ResidualTol     1e-3                          
-DisplacementTol 1e-4                      
-ResidualMax     1e20              
-StiffnessTol    1            
-DiagStiffness   1          
-ReduceStiffnessBy   0.1
-IncreaseStiffnessBy 2
-MinCatchBlock       5
-MinTowingSpeed      0.1
-UsePreviousAsPrecalc 1
-```
+
+## Dependencies
+- [Accord.Math]() - dense matrix computations (will be removed soon)
+- [CSparse]() - sparse matrix computations
+- [YamlDotNet]() - yaml job configuration parsing
+- [CommandLineParser]() - CLI argments parsing

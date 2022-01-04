@@ -1,0 +1,37 @@
+paths: 
+  output_shapes: demoshapes.txt
+  output_results: demoresults.txt        
+
+material: 
+  mesh_side: 0.120000            
+  mesh_orientation: 0
+  knot_size: 0.012000           
+  twine_stiffness: 1000.000000         
+  knot_stiffness: 1000.000000 
+
+geometry: 
+  meshes_along: 100                 
+  meshes_around: 100                 
+  entrance_radius: 0.400000           
+
+catches: [50, 75]
+towing_speed: 1.500000 # speed         
+
+solver: 
+  iter_max: 3000
+  residual_tol: 1e-3         # norm force < 0.001 N
+  displacement_tol: 1e-4     # norm dispacement < 0.1 mm
+  residual_max: 10e20        # Maximum residual after which the scheme is considered divergent
+  stiffness_tol: 1            
+  diag_stiffness: 1
+
+  reduce_stiffness_by: 0.1
+  increase_stiffness_by: 2
+
+  show_line_search_steps: false
+  line_search_max: 6               # maximum amount of inexact line search iterations
+  alpha_max: 0.032           # alpha for Armijo step limit globalization method (20% of twine length)
+
+  min_catch_block: 5
+  min_towing_speed: 0.1
+  use_previous_as_precalc: true
