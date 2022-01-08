@@ -1,20 +1,19 @@
-using System.IO;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace AxiCodend
 {
     interface ICodendSaver {
-        string Path {get; set;}
-        void append_run(int blockedMeshes, double towingSpeed, CodendMetrics metrics, double[] dofShape);
-        void header(HexMeshPanelMaterial material, CodendGeometry geometry);
-        void save(double[][] shapes);
-        // void append(double[] shape);
+        string Path {get; init;}
+        void AddRun(int blockedMeshes, double towingSpeed, CodendMetrics metrics, double[] dofShape);
+        void AddHeader(HexMeshPanelMaterial material, CodendGeometry geometry);
+        void Finish();
     }
-
 
     public class CSVResultSaver : ICodendSaver
     {
-        public string Path {get; set;}
+        public string Path {get; init;}
         public string Separator {get; set;}
         private int HeaderSize = 27;
 
@@ -23,7 +22,7 @@ namespace AxiCodend
             this.Separator = separator;
         }
 
-        public void header(HexMeshPanelMaterial material, CodendGeometry geometry) {
+        public void AddHeader(HexMeshPanelMaterial material, CodendGeometry geometry) {
             using (StreamWriter ResultFile = new StreamWriter(Path)) {
                 ResultFile.WriteLine("HEADER:");
                 ResultFile.WriteLine(material.ToString());
@@ -43,7 +42,7 @@ namespace AxiCodend
             }
         }
 
-        public void append_run(int blockedMeshes, double towingSpeed, CodendMetrics metrics, double[] dofShape) {
+        public void AddRun(int blockedMeshes, double towingSpeed, CodendMetrics metrics, double[] dofShape) {
             string[] lines = File.ReadAllLines(Path);
             string output = "";
             if (lines.Length > HeaderSize) {
@@ -91,24 +90,69 @@ namespace AxiCodend
             File.WriteAllText(Path, output);
         }
 
-        public void save(double[][] shapes) {
-            using (StreamWriter ResultFile = File.AppendText(Path))
-            {
-                for (int row = 0; row < shapes[0].Length; row++)
-                {
-                    for (int col = 0; col < shapes.Length - 1; col++)
-                    {
-                        ResultFile.Write("{0:E5}{1}", shapes[col][row], this.Separator);
-                    }
-                    ResultFile.Write("{0:E5}\n", shapes[shapes.Length - 1][row]);
-                }
-            }
+        public void Finish() {
+
         }
         // end CSVShapeSaver
     }
 
-    // public class JSONResultSaver : ICodendSaver {
-    //   string Path
-    //}
+
+    public struct JSONResultTemplate {
+        public HexMeshPanelMaterial material;
+        public CodendGeometry geometry;
+        public List<JSONResultRun> runs = new List<JSONResultRun>();
+    }
+
+    public struct JSONResultRun {
+        public int meshes_blocked {get; init;}
+        public double towing_speed {get; init;}
+        public CodendMetrics metrics {get; init;}
+        public double[] dof_shape {get; init;}
+    }
+
+    public class JSONResultSaver : ICodendSaver {
+        public string Path {get; init;}
+        private JSONResultTemplate template;
+
+        public JSONResultSaver(string Path) {
+            this.Path = Path;
+            this.template = new JSONResultTemplate();
+        }
+
+        public void AddRun(int blockedMeshes, double towingSpeed, CodendMetrics metrics, double[] dofShape) {
+            this.template.runs.Add(
+                new JSONResultRun {
+                    meshes_blocked = blockedMeshes,
+                    towing_speed = towingSpeed,
+                    metrics = metrics,
+                    dof_shape = dofShape
+                }
+            );
+        }
+        
+        public void AddHeader(HexMeshPanelMaterial material, CodendGeometry geometry) {
+            this.template.material = material;
+            this.template.geometry = geometry;
+        }
+
+        public void Finish() {
+            // based on
+            // https://www.newtonsoft.com/json/help/html/NamingStrategySnakeCase.htm
+            //
+            DefaultContractResolver contractResolver = new DefaultContractResolver
+            {
+                NamingStrategy = new SnakeCaseNamingStrategy()
+            };
+
+            string json = JsonConvert.SerializeObject(
+                this.template, new JsonSerializerSettings {
+                    ContractResolver = contractResolver,
+                    Formatting = Formatting.Indented
+            });
+            using (StreamWriter ResultFile = new StreamWriter(Path)) {
+                ResultFile.Write(json);
+            }
+        }
+    }
 
 }

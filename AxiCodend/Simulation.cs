@@ -16,7 +16,6 @@ namespace AxiCodend
 
 
         public SolverSettings SolverSettings { get; set; }
-        public OutputPaths Paths { get; set; }
         public ICodendSaver ResultSaver {get; set;}
 
         private double[] precalcX;
@@ -31,7 +30,6 @@ namespace AxiCodend
             this.Codend = Codend;
             this.catches = catches;
             this.towing_speed = towing_speed;
-            Paths = new OutputPaths(); // go with default settingst
 
             this.ResultSaver = result_saver;
             SolverSettings = new SolverSettings(); // go with default settingst
@@ -268,7 +266,7 @@ namespace AxiCodend
             stopwatch.Start();
 
             double[][] allX = new double[catches.Length][];
-            ResultSaver.header(Codend.Material, Codend.Geometry);
+            ResultSaver.AddHeader(Codend.Material, Codend.Geometry);
 
             for (int i = 0; i < catches.Length; i++)
             {
@@ -279,7 +277,7 @@ namespace AxiCodend
                 Codend.ApplyCatch(catches[i]);
                 Solve();
 
-                ResultSaver.append_run(
+                ResultSaver.AddRun(
                     catches[i],
                     towing_speed,
                     Codend.GetMetrics(),
@@ -298,6 +296,8 @@ namespace AxiCodend
                 "\nSimulation of {0} catches is finished in {1} [ms]\n",
                 catches.Length,
                 stopwatch.ElapsedMilliseconds);
+
+            ResultSaver.Finish();
 
         }
 

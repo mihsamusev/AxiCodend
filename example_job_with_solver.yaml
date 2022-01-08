@@ -1,7 +1,3 @@
-paths: 
-  output_shapes: demoshapes.txt
-  output_results: demoresults.txt        
-
 material: 
   mesh_side: 0.120000            
   mesh_orientation: 0
@@ -15,7 +11,11 @@ geometry:
   entrance_radius: 0.400000           
 
 catches: [50, 75]
-towing_speed: 1.500000 # speed         
+towing_speed: 1.500000       
+
+output: 
+  filename: myresults
+  format: json
 
 solver:                      # *optional solver settings
   iter_max: 3000

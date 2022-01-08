@@ -1,11 +1,28 @@
-﻿
-
-using CommandLine;
+﻿using CommandLine;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace AxiCodend
 {
 
+    enum OutputFormats {
+        txt = 0,
+        json = 1
+    }
+
+    struct Output {
+        public string Filename {get; init;} = "results";
+        public OutputFormats Format {get; init;} = OutputFormats.json;
+
+        public bool Valid() {
+            return Directory.Exists(Path.GetDirectoryName(Filename));
+        }
+
+        public string GetPath() {
+            return Path.Combine(
+                Directory.GetCurrentDirectory(), 
+                Path.ChangeExtension(this.Filename, this.Format.ToString()));
+        }
+    }
 
     public class InputArguments
     {
@@ -13,9 +30,8 @@ namespace AxiCodend
         public string? jobFile {get; set;}
     }
 
-    struct JobConfig
-    {
-        public OutputPaths paths {get; set;}
+    struct JobConfig {
+        public Output output {get; set;}
         public HexMeshPanelMaterial material {get; set;}
         public CodendGeometry geometry {get; set;}
         public int[] catches {get; set;} = {};
@@ -23,7 +39,7 @@ namespace AxiCodend
         public SolverSettings solver {get; set;}
 
         public JobConfig() {
-            paths = new OutputPaths();
+            output = new Output();
             material = new HexMeshPanelMaterial();
             geometry = new CodendGeometry();
             solver = new SolverSettings();
@@ -51,36 +67,38 @@ namespace AxiCodend
         static void Run(InputArguments args)
         {
             var cfg = ParseYaml<JobConfig>(args.jobFile);
-            var hexMeshMaterial = cfg.material;
+            var codendMaterial = cfg.material;
             var solverSettings = cfg.solver;
             var codendGeometry = cfg.geometry;
-
             
+
             AxiCodend codend = new AxiCodend();
-            if (hexMeshMaterial.MeshOrientation == MeshOrientation.T0) {
-                codend = new AxiModelT0(codendGeometry, hexMeshMaterial);   // initialize T0 model
-            } else if (hexMeshMaterial.MeshOrientation == MeshOrientation.T90) {
-                codend = new AxiModelT90(codendGeometry, hexMeshMaterial);
+            if (codendMaterial.MeshOrientation == MeshOrientation.T0) {
+                codend = new AxiModelT0(codendGeometry, codendMaterial);   // initialize T0 model
+            } else if (codendMaterial.MeshOrientation == MeshOrientation.T90) {
+                codend = new AxiModelT90(codendGeometry, codendMaterial);
             } else {
-                throw new IOException("Incorrect mesh orientation. Value should be 0 or 90.");
+                throw new ArgumentException(
+                    "Incorrect mesh orientation. Value should be 0 or 90.");
             }
 
-            var rs = new CSVResultSaver(cfg.paths.OutputShapes);
+            var output = cfg.output;
+            ICodendSaver resultSaver;
+            if (output.Format == OutputFormats.json) {
+                resultSaver = new JSONResultSaver(output.GetPath());
+            } else if (output.Format == OutputFormats.txt) {
+                resultSaver = new CSVResultSaver(output.GetPath());
+            } else {
+                throw new ArgumentException(
+                    "Incorrect file format. Value should \"json\" or \"txt\".");  
+            }
 
-            // var csvSaver = new CSVResultSaverBuilder
-            //    .WithHeader(hexMeshMaterial, codendGeometry);
-            // var jsonSaver = new JSONResultSaverBuilder
-            //    .WithHeader(hexMeshMaterial, codendGeometry);
-
-            var TowingSimulation = new Simulation(codend, cfg.catches, cfg.towing_speed, rs)
-            {
+            var TowingSimulation = new Simulation(
+                codend, cfg.catches, cfg.towing_speed, resultSaver) {
                 SolverSettings = solverSettings,
-                Paths = cfg.paths
             };
 
             TowingSimulation.Simulate();
-
-            Console.Write(codend.GetMetrics().ToString());
         }
 
 

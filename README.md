@@ -29,10 +29,6 @@ dotnet run --project AxiCodend --job example_job.yaml # from the solution folder
 The job configuration file consists of settings regarding the cod-end geometry, materials, loads, simulation output paths and solver settings.
 
 ```yaml
-paths: 
-  output_shapes: demoshapes.txt
-  output_results: demoresults.txt        
-
 material: 
   mesh_side: 0.120000           # twine length in [m]
   mesh_orientation: 0           # T0 or T90 (see paper)
@@ -48,6 +44,14 @@ geometry:
 catches: [50, 75]           # in number of blocked meshes from the end
 towing_speed: 1.500000      # speed [m/s]
 
+output: 
+  filename: myresults
+  format: json                  # [json, txt]
+```
+
+Optionally, one can configure many the iterative solver parameters. The method is based on Newton-Raphson method with a few additional heuristics for descent stability. Based on our testing the solver parameters given below are sufficient for 99% of the cases. However if in need of more fine grained control the simulation algorithm and solver parameters are described in the thesis.
+
+```yaml
 solver:
   iter_max: 3000
   residual_tol: 1e-3         # when to finishe the iteration based on norm force < 0.001 N
@@ -67,30 +71,86 @@ solver:
   min_towing_speed: 0.1            
   use_previous_as_precalc: false # warm start for the series of simulations
 ```
-*Note: Based on our testing the given solver parameters are sufficient for 99% of the cases. However if in need of more fine grained control the simulation algorithm and solver parameters are described in the thesis.*
+
 
 ### Typical results
-If the simulation is successful the results are saved in 2 `.txt` files. The `results.txt` containts global simulation results such as total drag force, achived length and max cod-end radius. 
+If the simulation is successful `.json` result contains a header dublicating the material and the geometry from the job config. The `runs` key contains a list of simulation results, one for each `meshes_blocked` input. The `metrics` contains the general description of the resulting shape like length and volume. the `dof_shape` contains the list of coordinates for each degree of freedom in the resulting codend shape. Depending on the codend mesh orientation the coordinates are polar `[x_0, r_0, ..., x_n, r_n]` for `T0` or cartesian `[x_0, y_0, z_0, ..., x_n, y_n, z_n]` for `T90`. All units are SI.
+
+```json
+{
+  "material": {
+    "mesh_side": 0.12,
+    "knot_size": 0.012,
+    "twine_stiffness": 1000.0,
+    "knot_stiffness": 1000.0,
+    "mesh_orientation": 0
+  },
+  "geometry": {
+    "meshes_along": 100,
+    "meshes_around": 100,
+    "entrance_radius": 0.4
+  },
+  "runs": [
+    {
+      "meshes_blocked": 50,
+      "towing_speed": 1.5,
+      "metrics": {
+        "length": 11.677690629036436,
+        "max_radius": 1.8757983780600964,
+        "catch_thickness": 4.544390246871821,
+        "catch_surface": 53.75000030810305,
+        "catch_volume": 41.29709565785832,
+        "catch_drag": 10069.469117747492,
+        "entrance_drag": 10069.469135350682
+      },
+      "dof_shape": [
+        0.0,
+        0.4,
+        0.013094020279622212,
+        0.3981795816161083,
+        ...
+        11.677690629036436,
+        0.0
+      ]
+    },
+    {
+      "meshes_blocked": 75,
+      "towing_speed": 1.5,
+      "metrics": {
+        "length": 10.44678264074785,
+        "max_radius": 1.9306513710826414,
+        "catch_thickness": 7.081715492570243,
+        "catch_surface": 84.84607570796004,
+        "catch_volume": 71.40537314715513,
+        "catch_drag": 10193.596462004796,
+        "entrance_drag": 10193.596482952864
+      },
+      "dof_shape": [
+        0.0,
+        0.4,
+        0.013197741564606073,
+        0.40086159222349127,
+        0.0748995701004251,
+        0.4050895789350485,
+        ...
+        10.44678264074785,
+        0.0
+      ]
+    }
+  ]
+}
 ```
-Length              Max radius          Catch thickness     Catch surface       Catch volume        Total reaction      Total force         
-1.16777E+001        1.87580E+000        4.54439E+000        5.37500E+001        4.12971E+001        1.00695E+004        1.00695E+004        
-1.04468E+001        1.93065E+000        7.08172E+000        8.48461E+001        7.14054E+001        1.01936E+004        1.01936E+004   
+## Visualization
+The `preview_results.py` is a small visualization `python` script that depends on `matplotlib` and `numpy` libraries. Run as follows.
+
+```sh
+python preview_shapes -i myresults.json
 ```
 
-The `shapes.txt` contains a series of coordinates serialized as pairs of axial and radial coordinates of the cod-end meridian (one line of twines). Multiple runs are appended to the same result files and each column corresponds to one simulation from `results.txt`. Since the structure us axis-symmetric this is sufficient to recover the final deformed sape of the cod-end. In `shapes.txt`. As a sanity check notice that the 2nd coordinate (radial coordinate of the first node) in both columns equals to the entrance radius. The second to last coordinate (axial coordinate of the last node) equals to the result cod-end length.
-
-```
-0.00000E+000   0.00000E+000   
-4.00000E-001   4.00000E-001   
-1.30940E-002   1.31977E-002   
-3.98180E-001   4.00862E-001   
-...
-1.16777E+001   1.04468E+001   
-0.00000E+000   0.00000E+000
-```
 
 ## Dependencies
-- [Accord.Math](https://www.nuget.org/packages/Accord.Math/) - dense matrix computations (will be removed soon)
-- [CSparse](https://www.nuget.org/packages/CSparse/) - sparse matrix computations
-- [YamlDotNet](https://www.nuget.org/packages/YamlDotNet/) - yaml job configuration parsing
+- [Accord.Math](https://www.nuget.org/packages/Accord.Math/) - dense matrix core FEM computations (will be removed asap)
+- [CSparse](https://www.nuget.org/packages/CSparse/) - sparse matrix core FEM computations
+- [YamlDotNet](https://www.nuget.org/packages/YamlDotNet/) - YAML job configuration parsing
 - [CommandLineParser](https://www.nuget.org/packages/CommandLineParser) - CLI argments parsing
+- [Newtonsoft.Json](https://www.nuget.org/packages/Newtonsoft.Json/) - JSON Output
