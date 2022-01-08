@@ -90,7 +90,7 @@ The `shapes.txt` contains a series of coordinates serialized as pairs of axial a
 ```
 
 ## Dependencies
-- [Accord.Math]() - dense matrix computations (will be removed soon)
-- [CSparse]() - sparse matrix computations
-- [YamlDotNet]() - yaml job configuration parsing
-- [CommandLineParser]() - CLI argments parsing
+- [Accord.Math](https://www.nuget.org/packages/Accord.Math/) - dense matrix computations (will be removed soon)
+- [CSparse](https://www.nuget.org/packages/CSparse/) - sparse matrix computations
+- [YamlDotNet](https://www.nuget.org/packages/YamlDotNet/) - yaml job configuration parsing
+- [CommandLineParser](https://www.nuget.org/packages/CommandLineParser) - CLI argments parsing

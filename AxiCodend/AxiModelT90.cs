@@ -50,10 +50,8 @@ namespace AxiCodend
         // CLASS CONSTRUCTOR
         //====================
 
-        public AxiModelT90(int nx, int nr, double r0, HexMeshPanelMaterial Material) : base(nx, nr, r0, Material)
-        {
-
-        }
+        public AxiModelT90(CodendGeometry geometry, HexMeshPanelMaterial material) : base(geometry, material)
+        {}
 
         //=====================
         // CLASS METHODS

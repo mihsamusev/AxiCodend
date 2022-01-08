@@ -66,34 +66,7 @@ namespace AxiCodend
         // CLASS CONSTRUCTOR
         //====================
 
-        public AxiModelT0(int nx, int nr, double r0, HexMeshPanelMaterial Material) : base(nx, nr, r0, Material)
-        {
-
-        }
-
-        public AxiModelT0(CodendGeometry geometry, HexMeshPanelMaterial Material)
-        {
-            /*main inputs*/
-            this.nx = geometry.MeshesAlong;
-            this.nr = geometry.MeshesAround;
-            this.r0 = geometry.EntranceRadius;
-            this.Material = Material;
-
-            nc = nx;    // to start with entire codend is blocked
-
-            l0 = Material.KnotSize;
-            m0 = Material.MeshSide / 2;
-            kl = Material.KnotStiffness;
-            km = Material.TwineStiffness;
-
-            towSpeed = 1;
-            P = 0.5 * catchCd * rhoWater * Math.Pow(towSpeed, 2);
-
-            SetDOF();
-            SetBlockedMeshes();
-            ClearState();
-            SetAngles();
-        }
+        public AxiModelT0(CodendGeometry geometry, HexMeshPanelMaterial material) : base(geometry, material){}
 
         //====================
         // CLASS METHODS
@@ -332,7 +305,11 @@ namespace AxiCodend
                     d3 = X[8 * i + 8]; // dx(last)
                     d4 = X[8 * i + 9]; // dr(last)
 
-                    l33 = Math.Sqrt(Math.Pow((d3 - d1), 2) + Math.Pow((-d2 * si), 2) + Math.Pow((d4 - d2 * co), 2));                // c-d knot length
+                    l33 = Math.Sqrt(
+                        Math.Pow((d3 - d1), 2) + 
+                        Math.Pow((-d2 * si), 2) + 
+                        Math.Pow((d4 - d2 * co), 2));                // c-d knot length
+
                     if (l33 < m0)
                         l33 = m0;
 

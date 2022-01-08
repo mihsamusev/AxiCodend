@@ -5,19 +5,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace AxiCodend
 {
-    struct CodendGeometry {
-        public int MeshesAlong {get; set;} = 100;                 
-        public int MeshesAround {get; set;} = 100;                 
-        public double EntranceRadius {get; set;} = 0.400000;
 
-        public override string ToString()
-        {
-            return "Codend geometry:\n" +  
-                String.Format("{0,-35}{1,-10:D}\n", "Meshes along", MeshesAlong) + 
-                String.Format("{0,-35}{1,-10:D}\n", "Meshes around", MeshesAround) + 
-                String.Format("{0,-35}{1,-10:F2}{2}\n", "Entrance radius", EntranceRadius,"[m]");
-        }
-    }
 
     public class InputArguments
     {
@@ -63,35 +51,36 @@ namespace AxiCodend
         static void Run(InputArguments args)
         {
             var cfg = ParseYaml<JobConfig>(args.jobFile);
-
             var hexMeshMaterial = cfg.material;
-            Console.WriteLine(hexMeshMaterial.ToString());
-
             var solverSettings = cfg.solver;
-            Console.WriteLine(solverSettings.ToString());
-            
             var codendGeometry = cfg.geometry;
-            Console.WriteLine(codendGeometry.ToString());
+
             
-            // create a builder
             AxiCodend codend = new AxiCodend();
-            
-            if (hexMeshMaterial.MeshOrientation == MeshOrientation.T0)
-            {
+            if (hexMeshMaterial.MeshOrientation == MeshOrientation.T0) {
                 codend = new AxiModelT0(codendGeometry, hexMeshMaterial);   // initialize T0 model
-            }
-            else
-            {
+            } else if (hexMeshMaterial.MeshOrientation == MeshOrientation.T90) {
+                codend = new AxiModelT90(codendGeometry, hexMeshMaterial);
+            } else {
                 throw new IOException("Incorrect mesh orientation. Value should be 0 or 90.");
             }
 
-            var TowingSimulation = new Simulation(codend, cfg.catches, cfg.towing_speed)
+            var rs = new CSVResultSaver(cfg.paths.OutputShapes);
+
+            // var csvSaver = new CSVResultSaverBuilder
+            //    .WithHeader(hexMeshMaterial, codendGeometry);
+            // var jsonSaver = new JSONResultSaverBuilder
+            //    .WithHeader(hexMeshMaterial, codendGeometry);
+
+            var TowingSimulation = new Simulation(codend, cfg.catches, cfg.towing_speed, rs)
             {
                 SolverSettings = solverSettings,
                 Paths = cfg.paths
             };
 
             TowingSimulation.Simulate();
+
+            Console.Write(codend.GetMetrics().ToString());
         }
 
 

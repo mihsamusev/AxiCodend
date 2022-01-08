@@ -2,13 +2,13 @@
 
 namespace AxiCodend
 {
-    enum MeshOrientation
+    public enum MeshOrientation
     {
         T0 = 0,
         T90 = 90
     }
 
-    struct HexMeshPanelMaterial
+    public struct HexMeshPanelMaterial
     {
         //======================
         // FIELDS
@@ -25,7 +25,7 @@ namespace AxiCodend
 
         public override string ToString()
         {
-            return String.Format("\nHexagonal panel material info:\n") + 
+            return String.Format("Hexagonal panel material info:\n") + 
                 String.Format("{0,-35}{1,-10:F3}{2}\n", "Mesh side", MeshSide, "[m]") +
                 String.Format("{0,-35}{1,-10:F3}{2}\n", "Knot size", KnotSize, "[m]") +
                 String.Format("{0,-35}{1,-10:F3}{2}\n", "Twine tensile stiffness [EA]", TwineStiffness, "[N]") +

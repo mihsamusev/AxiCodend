@@ -1,7 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CSparse.Double.Factorization;
 using CSparse;
 
@@ -20,6 +17,8 @@ namespace AxiCodend
 
         public SolverSettings SolverSettings { get; set; }
         public OutputPaths Paths { get; set; }
+        public ICodendSaver ResultSaver {get; set;}
+
         private double[] precalcX;
         private double[] previousX;
 
@@ -27,12 +26,14 @@ namespace AxiCodend
         // CONSTRUCTOR
         //============================
 
-        public Simulation(AxiCodend Codend, int[] catches, double towing_speed)
+        public Simulation(AxiCodend Codend, int[] catches, double towing_speed, ICodendSaver result_saver)
         {
             this.Codend = Codend;
             this.catches = catches;
             this.towing_speed = towing_speed;
             Paths = new OutputPaths(); // go with default settingst
+
+            this.ResultSaver = result_saver;
             SolverSettings = new SolverSettings(); // go with default settingst
             precalcX = new double[Codend.dof];
             previousX = new double[Codend.dof];
@@ -98,7 +99,7 @@ namespace AxiCodend
 
             if (SolverSettings.UsePreviousAsPrecalc && DisplacmentNorm(previousX) != 0)
             {
-                previousX.CopyTo(Codend.X,0);
+                previousX.CopyTo(Codend.X, 0);
             }
             else
             {
@@ -106,7 +107,7 @@ namespace AxiCodend
             }
         }
 
-        private bool IncorrectSolution()
+        private bool IsIncorrectSolution()
         {
             if (Codend.X.Min() < 0)
             {
@@ -219,14 +220,15 @@ namespace AxiCodend
                         Codend.UpdateResidual();
 
                         iter++;                                                   // display iteration status
-                        PrintIter(iter, 0, addStiff, Codend.R, hNorm);
+                        Console.WriteLine(
+                            PrintIter(iter, 0, addStiff, Codend.R, hNorm));
                     }
 
                     //===================
                     // Restart routine               
                     //===================
 
-                    if (hasDiverged || IncorrectSolution())
+                    if (hasDiverged || IsIncorrectSolution())
                     {
                         restartsCount += 1;
                         addStiff0 *= SolverSettings.IncreaseStiffnessBy;
@@ -262,18 +264,26 @@ namespace AxiCodend
 
         public void Simulate()
         {
-            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch stopwatch = new Stopwatch(); // can wrap entire Solver class
             stopwatch.Start();
 
             double[][] allX = new double[catches.Length][];
-            StartResultsFile();
+            ResultSaver.header(Codend.Material, Codend.Geometry);
+
             for (int i = 0; i < catches.Length; i++)
             {
+                Console.WriteLine(
+                    "Simulation {0} with {1} blocked meshes\n", i, catches[i]);
+
                 Codend.ApplyTowing(towing_speed);
                 Codend.ApplyCatch(catches[i]);
-                Console.WriteLine("Simulation {0} with {1} blocked meshes\n", i, catches[i]);
                 Solve();
-                AppendResults();
+
+                ResultSaver.append_run(
+                    catches[i],
+                    towing_speed,
+                    Codend.GetMetrics(),
+                    Codend.X);
 
                 if (SolverSettings.UsePreviousAsPrecalc)
                 {
@@ -282,76 +292,22 @@ namespace AxiCodend
 
                 allX[i] = Codend.X;                
             }
-            SaveShapes(allX);
 
-            Console.WriteLine("\nSimulation of {0} catches is finished in {1} [ms]\n",
-            catches.Length, stopwatch.ElapsedMilliseconds);
+
+            Console.WriteLine(
+                "\nSimulation of {0} catches is finished in {1} [ms]\n",
+                catches.Length,
+                stopwatch.ElapsedMilliseconds);
 
         }
 
-        private void SaveShapes(double[][] allX)
+        private string PrintIter(int iter, int funEval, double addStiff, double R, double hNorm)
         {
-            using (StreamWriter ResultFile = new StreamWriter(Paths.OutputShapes))
-            {
-                for (int row = 0; row < Codend.dof; row++)
-                {
-                    for (int col = 0; col < catches.Length; col++)
-                    {
-                        ResultFile.Write("{0,-15:E5}",allX[col][row]);
-                    }
-                    ResultFile.WriteLine();
-                }
-            }
-        }
-
-        private void StartResultsFile()
-        {
-            using (StreamWriter ResultFile = new StreamWriter(Paths.OutputResults))
-            {
-                ResultFile.WriteLine("{0,-20}{1,-20}{2,-20}{3,-20}{4,-20}{5,-20}{6,-20}",
-                                     "Length",
-                                     "Max radius",
-                                     "Catch thickness",
-                                     "Catch surface",
-                                     "Catch volume",
-                                     "Total reaction",
-                                     "Total force");
-            }
-        }
-
-        private void AppendResults()
-        {
-            using (StreamWriter ResultFile = File.AppendText(Paths.OutputResults))
-            {
-                ResultFile.WriteLine("{0,-20:E5}{1,-20:E5}{2,-20:E5}{3,-20:E5}{4,-20:E5}{5,-20:E5}{6,-20:E5}",
-                     Codend.Length(),
-                     Codend.MaxRadius(),
-                     Codend.CatchThickness(),
-                     Codend.CatchSurface(),
-                     Codend.CatchVolume(),
-                     Codend.EntranceDrag(),
-                     Codend.CatchDrag());
-            }
-        }
-
-        private void SaveArrayToPath(double[] X, string path)
-        {
-            using (StreamWriter ResultFile = new StreamWriter(path))
-            {
-                for (int i = 0; i < X.Length; i++)
-                {
-                    ResultFile.WriteLine(X[i]);
-                }
-            }
-        }
-
-        private void PrintIter(int iter, int funEval, double addStiff, double R, double hNorm)
-        {
-            Console.WriteLine(String.Format("Iter: {0,-7:D}" +
-                                            "LS steps: {1,-6:D}" +
-                                            "addStiff: {2,-10:e2}{3,-8:S}" +
-                                            "R: {4,-10:e2}{5,-6:S}" +
-                                            "|h|: {6,-10:e2}{7,-6:S}", iter, funEval, addStiff, "N/m", R,"N", hNorm,"m"));
+            return String.Format("Iter: {0,-7:D}" +
+                    "LS steps: {1,-6:D}" +
+                    "addStiff: {2,-10:e2}{3,-8:S}" +
+                    "R: {4,-10:e2}{5,-6:S}" +
+                    "|h|: {6,-10:e2}{7,-6:S}", iter, funEval, addStiff, "N/m", R,"N", hNorm,"m");
         }
     }
 }
